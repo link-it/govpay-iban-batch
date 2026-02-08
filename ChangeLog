@@ -1,0 +1,7 @@
+2026-02-06  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Creazione repository
+	Creato repository iniziale per il progetto govpay-iban-batch.
+	Configurazione base Spring Boot 3.5.7 con Java 21.
+	Importata pipeline di validazione e rilascio CI/CD dal progetto govpay-fdr-batch.
