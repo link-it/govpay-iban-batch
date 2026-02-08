@@ -238,7 +238,7 @@
                 </configuration>
             </plugin>
 
-            <!-- OpenAPI Generator Plugin -->
+            <!-- OpenAPI Generator Plugin - da abilitare quando saranno disponibili le specifiche OpenAPI
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
@@ -297,6 +297,7 @@
                     </execution>
                 </executions>
             </plugin>
+            -->
 
             <!-- JaCoCo Maven Plugin for Code Coverage -->
             <plugin>
