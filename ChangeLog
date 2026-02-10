@@ -1,3 +1,9 @@
+2026-02-10  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Adottato govpay-bom 1.1.0 come parent POM (Spring Boot 3.5.9).
+	Aggiunta dipendenza govpay-common 1.0.0-SNAPSHOT.
+
 2026-02-06  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]
