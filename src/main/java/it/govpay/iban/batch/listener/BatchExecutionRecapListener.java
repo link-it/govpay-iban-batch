@@ -132,8 +132,8 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
         if (!intermediariStats.isEmpty()) {
             log.info("Dettaglio per intermediario:");
             log.info("-".repeat(80));
-            log.info(String.format("%-20s %-10s %-10s %-10s %-10s %-15s %-10s",
-                "INTERMEDIARIO", "LETTI", "PROCESSATI", "SKIPPATI", "ERRORI", "STATUS", "DURATA(s)"));
+            log.info(String.format("%-20s %-10s %-10s %-10s %-15s %-10s",
+                "INTERMEDIARIO", "LETTI", "PROCESSATI", "ERRORI", "STATUS", "DURATA(s)"));
             log.info("-".repeat(80));
 
             intermediariStats.values().forEach(stats -> 

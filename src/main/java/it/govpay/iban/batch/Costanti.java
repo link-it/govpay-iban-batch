@@ -6,11 +6,6 @@ public class Costanti {
 		// Costruttore privato per evitare istanziazione
 	}
 
-	// Job parameters per gestione multi-nodo
-    public static final String GOVPAY_BATCH_JOB_ID = "JobID";
-    public static final String GOVPAY_BATCH_JOB_PARAMETER_WHEN = "When";
-    public static final String GOVPAY_BATCH_JOB_PARAMETER_CLUSTER_ID = "ClusterID"; 
-
     public static final String PATTERN_TIMESTAMP_3_YYYY_MM_DD_T_HH_MM_SS_SSSXXX = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
 
     // Pattern con millisecondi variabili (1-9 cifre) per deserializzazione sicura da pagoPA
@@ -18,8 +13,6 @@ public class Costanti {
 
     // Pattern per serializzazione date alle API esterne (3 cifre millisecondi senza timezone)
     public static final String PATTERN_DATA_JSON_YYYY_MM_DD_T_HH_MM_SS_SSS = "yyyy-MM-dd'T'HH:mm:ss.SSS";
-
-	public static final String MSG_PAYLOAD_NON_SERIALIZZABILE = "Payload non serializzabile";
 
 	// Nome job IBAN check
 	public static final String IBAN_CHECK_JOB_NAME = "ibanCheckJob";

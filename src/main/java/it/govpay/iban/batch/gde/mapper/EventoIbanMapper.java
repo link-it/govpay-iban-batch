@@ -25,6 +25,8 @@ import java.util.List;
 @Component
 public class EventoIbanMapper {
 
+    private static final int MAX_DETTAGLIO_ESITO_LENGTH = 1000;
+
     @Value("${govpay.batch.cluster-id}")
     private String clusterId;
 
@@ -168,7 +170,7 @@ public class EventoIbanMapper {
                                       NuovoEvento nuovoEvento) {
         if (exception != null) {
             if (exception instanceof HttpStatusCodeException httpStatusCodeException) {
-                nuovoEvento.setDettaglioEsito(httpStatusCodeException.getResponseBodyAsString());
+                nuovoEvento.setDettaglioEsito(truncate(httpStatusCodeException.getResponseBodyAsString(), MAX_DETTAGLIO_ESITO_LENGTH));
                 nuovoEvento.setSottotipoEsito(httpStatusCodeException.getStatusCode().value() + "");
 
                 if (httpStatusCodeException.getStatusCode().is5xxServerError()) {
@@ -177,7 +179,7 @@ public class EventoIbanMapper {
                     nuovoEvento.setEsito(EsitoEvento.KO);
                 }
             } else {
-                nuovoEvento.setDettaglioEsito(exception.getMessage());
+                nuovoEvento.setDettaglioEsito(truncate(exception.getMessage(), MAX_DETTAGLIO_ESITO_LENGTH));
                 nuovoEvento.setSottotipoEsito("500");
                 nuovoEvento.setEsito(EsitoEvento.FAIL);
             }
@@ -191,5 +193,10 @@ public class EventoIbanMapper {
                 nuovoEvento.setEsito(EsitoEvento.KO);
             }
         }
+    }
+
+    static String truncate(String value, int maxLength) {
+        if (value == null) return null;
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 }
