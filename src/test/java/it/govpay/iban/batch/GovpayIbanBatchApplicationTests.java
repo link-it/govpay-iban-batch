@@ -11,7 +11,8 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-        "spring.batch.job.enabled=false"
+        "spring.batch.job.enabled=false",
+        "spring.jpa.hibernate.ddl-auto=create-drop"
 })
 class GovpayIbanBatchApplicationTests {
 
