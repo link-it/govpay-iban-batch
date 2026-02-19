@@ -1,7 +1,6 @@
 package it.govpay.iban.batch.step2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -170,7 +169,6 @@ class IbanCheckProcessorTest {
         IbanPagopa result = processor.process(iban);
 
         // validityDate in future + ENABLED => isAfter(now) is true => ibanEnable = false (because of the !isAfter condition)
-        // Actually: iban.getValidityDate().isAfter(now) == true => condition is true => ibanEnable = ENABLED && !true = false
         // stored is true, iban is false => different abilitazione
         assertEquals(Costanti.CHECK_INFO_DIVERSE, result.getCheckStato());
         assertTrue(result.getCheckMotivo().contains("Abilitazione"));
