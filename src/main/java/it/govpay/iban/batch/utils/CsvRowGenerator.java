@@ -1,11 +1,15 @@
 package it.govpay.iban.batch.utils;
 
 import com.opencsv.CSVWriter;
+
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.StringWriter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 public class CsvRowGenerator {
 
     public String generateCsvRow(Map<String, String> data, List<String> headers) {
@@ -19,7 +23,7 @@ public class CsvRowGenerator {
             }
             csvWriter.writeNext(row);
         } catch (IOException e) {
-            throw new RuntimeException("Fail to generate csv row data", e);
+            log.error("Fail to generate csv row data", e);
         }
         return stringWriter.toString().trim();
     }
