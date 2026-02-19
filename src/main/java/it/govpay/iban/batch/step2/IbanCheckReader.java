@@ -31,7 +31,7 @@ public class IbanCheckReader implements ItemReader<IbanPagopa>, StepExecutionLis
     @Value("#{stepExecutionContext['totalPartitions']}")
     private Integer totalPartitions;
 
-	private List<IbanPagopa> ibans = null;;
+	private List<IbanPagopa> ibans = null;
 
     public IbanCheckReader(IbanPagopaApiService ibanPagopaApiService) {
     	this.ibanPagopaApiService = ibanPagopaApiService;
