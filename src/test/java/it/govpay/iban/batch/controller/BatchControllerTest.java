@@ -330,4 +330,89 @@ class BatchControllerTest {
         assertNotNull(response.getBody().getNextExecutionTime());
         assertEquals(7200000L, response.getBody().getIntervalMillis());
     }
+
+    // ============ Test aggiuntivi ============
+
+    @Test
+    void whenJobLauncherThrowsExceptionAsync_thenReturns202ButLogsError() throws Exception {
+        when(jobConcurrencyService.getCurrentRunningJobExecution(Costanti.IBAN_CHECK_JOB_NAME))
+                .thenReturn(null);
+        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)))
+                .thenThrow(new RuntimeException("Launcher failure"));
+
+        ResponseEntity<Object> response = batchController.eseguiJobEndpoint(false);
+
+        // Returns 202 because the job is launched asynchronously
+        assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
+        assertNull(response.getBody());
+    }
+
+    @Test
+    void whenGetLastExecution_andOnlyRunningExecutions_thenReturnsEmptyInfo() {
+        JobInstance jobInstance = new JobInstance(1L, Costanti.IBAN_CHECK_JOB_NAME);
+        JobExecution runningExecution = createJobExecution(CLUSTER_ID, BatchStatus.STARTED);
+
+        when(jobExplorer.getJobInstances(Costanti.IBAN_CHECK_JOB_NAME, 0, 10))
+                .thenReturn(List.of(jobInstance));
+        when(jobExplorer.getJobExecutions(jobInstance))
+                .thenReturn(List.of(runningExecution));
+
+        ResponseEntity<LastExecutionInfo> response = batchController.getLastExecutionEndpoint();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertNull(response.getBody().getExecutionId());
+    }
+
+    @Test
+    void whenGetNextExecution_andPreviousExecution_thenCalculatesNextTime() {
+        when(environment.matchesProfiles("cron")).thenReturn(false);
+
+        JobInstance jobInstance = new JobInstance(1L, Costanti.IBAN_CHECK_JOB_NAME);
+        JobExecution completedExecution = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
+        // Set end time far in the past so nextExecutionTime will be before now
+        completedExecution.setEndTime(LocalDateTime.now().minusHours(4));
+
+        when(jobExplorer.getJobInstances(Costanti.IBAN_CHECK_JOB_NAME, 0, 5))
+                .thenReturn(List.of(jobInstance));
+        when(jobExplorer.getJobExecutions(jobInstance))
+                .thenReturn(List.of(completedExecution));
+        when(jobConcurrencyService.getCurrentRunningJobExecution(Costanti.IBAN_CHECK_JOB_NAME))
+                .thenReturn(null);
+
+        ResponseEntity<NextExecutionInfo> response = batchController.getNextExecutionEndpoint();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("scheduler", response.getBody().getSchedulingMode());
+        assertNotNull(response.getBody().getLastCompletedTime());
+        // Since endTime was 4h ago and interval is 2h, nextExecutionTime is in the past,
+        // but no running job -> nextExecutionTime = now
+        assertNotNull(response.getBody().getNextExecutionTime());
+    }
+
+    @Test
+    void whenGetNextExecution_andJobCurrentlyRunning_thenNextTimeIsNull() {
+        when(environment.matchesProfiles("cron")).thenReturn(false);
+
+        JobInstance jobInstance = new JobInstance(1L, Costanti.IBAN_CHECK_JOB_NAME);
+        JobExecution completedExecution = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
+        completedExecution.setEndTime(LocalDateTime.now().minusHours(4));
+
+        JobExecution runningExecution = createJobExecution(CLUSTER_ID, BatchStatus.STARTED);
+
+        when(jobExplorer.getJobInstances(Costanti.IBAN_CHECK_JOB_NAME, 0, 5))
+                .thenReturn(List.of(jobInstance));
+        when(jobExplorer.getJobExecutions(jobInstance))
+                .thenReturn(List.of(completedExecution));
+        when(jobConcurrencyService.getCurrentRunningJobExecution(Costanti.IBAN_CHECK_JOB_NAME))
+                .thenReturn(runningExecution);
+
+        ResponseEntity<NextExecutionInfo> response = batchController.getNextExecutionEndpoint();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("scheduler", response.getBody().getSchedulingMode());
+        assertNull(response.getBody().getNextExecutionTime());
+    }
 }
