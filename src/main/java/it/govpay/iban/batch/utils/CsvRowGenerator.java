@@ -19,7 +19,7 @@ public class CsvRowGenerator {
             }
             csvWriter.writeNext(row);
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Fail to generate csv row data", e);
         }
         return stringWriter.toString().trim();
     }
