@@ -251,6 +251,15 @@ public class IbanPagopaApiService {
 	}
 
     /**
+     * Svuota la cache delle istanze ExternalApisApi.
+     * Alla prossima invocazione verranno ricreate con i dati aggiornati dal DB.
+     */
+    public void clearApiCache() {
+        log.info("Pulizia cache ExternalApisApi ({} entries)", apiCache.size());
+        apiCache.clear();
+    }
+
+    /**
      * Helper class to encapsulate the result of a page fetch operation.
      * Used to avoid nested try blocks.
      */

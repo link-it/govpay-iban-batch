@@ -18,7 +18,9 @@ import it.govpay.common.batch.dto.BatchStatusInfo;
 import it.govpay.common.batch.dto.LastExecutionInfo;
 import it.govpay.common.batch.dto.NextExecutionInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
+import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
+import it.govpay.iban.batch.service.IbanPagopaApiService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -30,16 +32,22 @@ import lombok.extern.slf4j.Slf4j;
 public class BatchController extends AbstractBatchController {
 
     private final Job ibanCheckJob;
+    private final ConnettoreService connettoreService;
+    private final IbanPagopaApiService ibanPagopaApiService;
 
     public BatchController(
             JobExecutionHelper jobExecutionHelper,
             JobExplorer jobExplorer,
             @Qualifier("ibanCheckJob") Job ibanCheckJob,
+            ConnettoreService connettoreService,
+            IbanPagopaApiService ibanPagopaApiService,
             Environment environment,
             ZoneId applicationZoneId,
             @Value("${scheduler.ibanCheckJob.fixedDelayString:7200000}") long schedulerIntervalMillis) {
         super(jobExecutionHelper, jobExplorer, environment, applicationZoneId, schedulerIntervalMillis);
         this.ibanCheckJob = ibanCheckJob;
+        this.connettoreService = connettoreService;
+        this.ibanPagopaApiService = ibanPagopaApiService;
     }
 
     @Override
@@ -50,6 +58,15 @@ public class BatchController extends AbstractBatchController {
     @Override
     protected String getJobName() {
         return Costanti.IBAN_CHECK_JOB_NAME;
+    }
+
+    @Override
+    protected ResponseEntity<String> clearCache() {
+        log.info("Svuotamento cache in corso...");
+        connettoreService.clearCache();
+        ibanPagopaApiService.clearApiCache();
+        log.info("Cache svuotate con successo");
+        return ResponseEntity.ok("Cache svuotate con successo");
     }
 
     @GetMapping("/eseguiJob")

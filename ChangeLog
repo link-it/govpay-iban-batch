@@ -1,3 +1,9 @@
+2026-02-19  Giuliano Pintori <pintori@link.it>
+
+	* [BatchController]
+	Implementato metodo clearCache() per svuotare le cache dei connettori
+	e delle istanze API client pagoPA.
+
 2026-02-10  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]

@@ -40,7 +40,9 @@ import it.govpay.common.batch.dto.NextExecutionInfo;
 import it.govpay.common.batch.dto.Problem;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.batch.service.JobConcurrencyService;
+import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
+import it.govpay.iban.batch.service.IbanPagopaApiService;
 
 class BatchControllerTest {
 
@@ -59,6 +61,12 @@ class BatchControllerTest {
     @Mock
     private Environment environment;
 
+    @Mock
+    private ConnettoreService connettoreService;
+
+    @Mock
+    private IbanPagopaApiService ibanPagopaApiService;
+
     private BatchController batchController;
 
     private static final String CLUSTER_ID = "TestCluster";
@@ -70,6 +78,7 @@ class BatchControllerTest {
         MockitoAnnotations.openMocks(this);
         when(jobExecutionHelper.getJobConcurrencyService()).thenReturn(jobConcurrencyService);
         batchController = new BatchController(jobExecutionHelper, jobExplorer, ibanCheckJob,
+                connettoreService, ibanPagopaApiService,
                 environment, ZONE_ID, SCHEDULER_INTERVAL_MILLIS);
     }
 
