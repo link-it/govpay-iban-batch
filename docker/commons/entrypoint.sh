@@ -125,52 +125,6 @@ if [ "${GOVPAY_IBAN_POP_DB_SKIP:-TRUE}" != "TRUE" ] && [ -n "${GOVPAY_DB_TYPE}" 
 fi
 
 ##############################################################################
-# Configurazione URL Base pagoPA IBAN API
-##############################################################################
-
-# Priorità 1: URL custom (se specificato, ha precedenza)
-if [ -n "${GOVPAY_IBAN_API_CUSTOMURL}" ]; then
-    PAGOPA_IBAN_BASE_URL="${GOVPAY_IBAN_API_CUSTOMURL}"
-    log_info "Utilizzo URL IBAN API personalizzato: ${PAGOPA_IBAN_BASE_URL}"
-# Priorità 2: Selezione URL basata su ambiente
-elif [ -n "${GOVPAY_IBAN_API_ENV}" ]; then
-    # Conversione a minuscolo per confronto case-insensitive
-    IBAN_ENV=$(echo "${GOVPAY_IBAN_API_ENV}" | tr '[:upper:]' '[:lower:]')
-
-    case "${IBAN_ENV}" in
-        prod|produzione)
-            PAGOPA_IBAN_BASE_URL="https://api.platform.pagopa.it/iban/service/v1"
-            log_info "Utilizzo ambiente IBAN API PRODUZIONE"
-            ;;
-        collaudo|test|stage|uat)
-            PAGOPA_IBAN_BASE_URL="https://api.uat.platform.pagopa.it/iban/service/v1"
-            log_info "Utilizzo ambiente IBAN API UAT/TEST"
-            ;;
-        *)
-            log_error "Valore GOVPAY_IBAN_API_ENV non valido: ${GOVPAY_IBAN_API_ENV}"
-            log_error "Valori ammessi: collaudo, test, stage, uat, prod, produzione"
-            exit 1
-            ;;
-    esac
-    log_info "URL Base IBAN API: ${PAGOPA_IBAN_BASE_URL}"
-fi
-
-# Validazione configurazione IBAN API obbligatoria
-if [ -z "${PAGOPA_IBAN_BASE_URL}" ]; then
-    log_error "Configurazione URL Base IBAN API mancante"
-    log_error "Impostare una di: GOVPAY_IBAN_API_CUSTOMURL o GOVPAY_IBAN_API_ENV"
-    exit 1
-fi
-export PAGOPA_IBAN_BASE_URL
-
-if [ -z "${GOVPAY_IBAN_API_SUBSCRIPTIONKEY}" ]; then
-    log_error "Subscription Key IBAN API mancante"
-    log_error "Richiesta: GOVPAY_IBAN_API_SUBSCRIPTIONKEY"
-    exit 1
-fi
-export PAGOPA_IBAN_SUBSCRIPTION_KEY="${GOVPAY_IBAN_API_SUBSCRIPTIONKEY}"
-
-##############################################################################
 # Configurazione Cluster ID
 ##############################################################################
 
@@ -254,7 +208,6 @@ log_info "Riepilogo Configurazione"
 log_info "========================================"
 log_info "Database: ${SPRING_DATASOURCE_URL}"
 log_info "Pool: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE}/${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE}"
-log_info "IBAN API: ${PAGOPA_IBAN_BASE_URL}"
 log_info "GDE: ${GOVPAY_GDE_ENABLED}"
 log_info "Cluster ID: ${GOVPAY_BATCH_CLUSTER_ID}"
 log_info "Java: MaxRAMPercentage=${GOVPAY_IBAN_JVM_MAX_RAM_PERCENTAGE:-${DEFAULT_MAX_RAM_PERCENTAGE}}%"
