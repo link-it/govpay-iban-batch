@@ -1,3 +1,12 @@
+2026-02-25  Giuliano Pintori <pintori@link.it>
+
+	* [EventoIbanMapper]
+	Corretto calcolo durata evento: ora espresso in millisecondi.
+
+	* [ProjectSetup]
+	Aggiornato govpay-bom a 1.1.2.
+	Aggiornato govpay-common a 1.0.0.
+
 2026-02-19  Giuliano Pintori <pintori@link.it>
 
 	* [BatchController]

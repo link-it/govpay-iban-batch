@@ -59,7 +59,7 @@ class EventoIbanMapperTest {
         assertEquals(TIPO_EVENTO, evento.getTipoEvento());
         assertEquals(TRANSACTION_ID, evento.getTransactionId());
         assertEquals(dataStart, evento.getDataEvento());
-        assertEquals(5L, evento.getDurataEvento());
+        assertEquals(5000L, evento.getDurataEvento());
     }
 
     @Test
