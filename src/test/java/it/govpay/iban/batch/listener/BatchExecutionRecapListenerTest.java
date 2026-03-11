@@ -1,8 +1,12 @@
 package it.govpay.iban.batch.listener;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -14,13 +18,21 @@ import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.StepExecution;
 
+import it.govpay.iban.batch.config.FileStorageConfig;
+import it.govpay.iban.batch.mail.MailService;
+
 class BatchExecutionRecapListenerTest {
 
     private BatchExecutionRecapListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new BatchExecutionRecapListener();
+        FileStorageConfig fileStorageConfig = mock(FileStorageConfig.class);
+        when(fileStorageConfig.isInviaMail()).thenReturn(false);
+        when(fileStorageConfig.getReportDirectory()).thenReturn(Path.of("/tmp"));
+        when(fileStorageConfig.getDestinatario()).thenReturn(Collections.emptyList());
+        MailService mailService = mock(MailService.class);
+        listener = new BatchExecutionRecapListener(fileStorageConfig, mailService);
     }
 
     private JobExecution createJobExecution() {

@@ -1,5 +1,9 @@
 package it.govpay.iban.batch.listener;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -12,6 +16,9 @@ import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.stereotype.Component;
 
+import it.govpay.common.mail.MailInfo;
+import it.govpay.iban.batch.config.FileStorageConfig;
+import it.govpay.iban.batch.mail.MailService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -22,9 +29,21 @@ import lombok.extern.slf4j.Slf4j;
 public class BatchExecutionRecapListener implements JobExecutionListener {
 
 	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+	private static final DateTimeFormatter FILE_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+
+    private final FileStorageConfig fileStorageConfig;
+    private final MailService mailService;
+
+    private String jobStartTimestamp;
+
+    public BatchExecutionRecapListener(FileStorageConfig fileStorageConfig, MailService mailService) {
+        this.fileStorageConfig = fileStorageConfig;
+        this.mailService = mailService;
+    }
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
+        jobStartTimestamp = LocalDateTime.now().format(FILE_TIMESTAMP_FORMATTER);
         log.info("=".repeat(80));
         log.info("INIZIO BATCH CONTROLLO IBAN");
         log.info("Job ID: {}", jobExecution.getJobId());
@@ -52,6 +71,76 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
         printStepStatistics(jobExecution);
 
         log.info("=".repeat(80));
+
+        // Invio report via email
+        inviaReportViaMail();
+    }
+
+    private void inviaReportViaMail() {
+        if (!fileStorageConfig.isInviaMail()) {
+            log.debug("Invio report via mail disabilitato");
+            return;
+        }
+
+        if (fileStorageConfig.getDestinatario() == null || fileStorageConfig.getDestinatario().isEmpty()) {
+            log.warn("Invio report via mail abilitato ma nessun destinatario configurato");
+            return;
+        }
+
+        if (!mailService.isAbilitato()) {
+            log.warn("Invio report via mail abilitato ma servizio mail non configurato o disabilitato in configurazione GovPay");
+            return;
+        }
+
+        Map<String, byte[]> allegati = raccogliReportFiles();
+
+        if (allegati.isEmpty()) {
+            log.info("Nessun file di report trovato da allegare");
+            return;
+        }
+
+        try {
+            MailInfo mailInfo = MailInfo.builder()
+                .to(fileStorageConfig.getDestinatario())
+                .oggetto(fileStorageConfig.getOggetto())
+                .testo(fileStorageConfig.getMessaggio())
+                .allegati(allegati)
+                .build();
+
+            mailService.inviaEmail(mailInfo);
+            log.info("Report inviato via mail a {}", fileStorageConfig.getDestinatario());
+        } catch (Exception e) {
+            log.error("Errore durante l'invio del report via mail: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Raccoglie i file di report CSV generati durante questa esecuzione del batch.
+     * I file hanno il formato reportCheckIban-{codIntermediario}-{yyyyMMdd_HHmmss}.csv
+     */
+    private Map<String, byte[]> raccogliReportFiles() {
+        Map<String, byte[]> allegati = new LinkedHashMap<>();
+        Path reportDir = fileStorageConfig.getReportDirectory();
+
+        if (!Files.isDirectory(reportDir)) {
+            log.warn("Directory report non trovata: {}", reportDir);
+            return allegati;
+        }
+
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(reportDir, "reportCheckIban-*-" + jobStartTimestamp + "*.csv")) {
+            for (Path file : stream) {
+                try {
+                    allegati.put(file.getFileName().toString(), Files.readAllBytes(file));
+                    log.debug("Allegato file report: {}", file.getFileName());
+                } catch (IOException e) {
+                    log.error("Errore lettura file report {}: {}", file, e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            log.error("Errore durante la scansione della directory report: {}", e.getMessage());
+        }
+
+        return allegati;
     }
 
     private void printStepStatistics(JobExecution jobExecution) {
@@ -104,8 +193,8 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
             totalWritten += partitionExec.getWriteCount();
             totalErrors += (int) (partitionExec.getReadSkipCount() + partitionExec.getProcessSkipCount());
 
-            long duration = Duration.between(partitionExec.getStartTime(), partitionExec.getEndTime()).toMillis();
-            totalDuration += duration;
+            long partDuration = Duration.between(partitionExec.getStartTime(), partitionExec.getEndTime()).toMillis();
+            totalDuration += partDuration;
 
             // Estrai codIntermediario dal nome della partizione o dal context
             String codIntermediario = extractCodIntermediario(partitionExec);
@@ -116,7 +205,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
                 stats.writeCount = (int) partitionExec.getWriteCount();
                 stats.errorCount = (int) (partitionExec.getReadSkipCount() + partitionExec.getProcessSkipCount());
                 stats.status = partitionExec.getStatus().toString();
-                stats.durationMs = duration;
+                stats.durationMs = partDuration;
                 intermediariStats.put(codIntermediario, stats);
             }
         }
@@ -136,7 +225,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
                 "INTERMEDIARIO", "LETTI", "PROCESSATI", "ERRORI", "STATUS", "DURATA(s)"));
             log.info("-".repeat(80));
 
-            intermediariStats.values().forEach(stats -> 
+            intermediariStats.values().forEach(stats ->
                 log.info(String.format("%-20s %-10d %-10d %-10d %-15s %-10.1f",
                     stats.codIntermediario,
                     stats.readCount,

@@ -127,6 +127,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Spring Mail (richiesto da AbstractMailService di govpay-common) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Csv utilities -->
         <dependency>
             <groupId>com.opencsv</groupId>
