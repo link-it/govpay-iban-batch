@@ -16,6 +16,9 @@ buildNumber.properties
 # License analysis reports
 third-party-licenses/
 
+# Docker build context
+docker/buildcontext/
+
 # IDEs and editors
 /.idea
 .project

@@ -1,0 +1,31 @@
+-- PostgreSQL DDL for IBAN_PAGOPA_TEMP table
+
+CREATE SEQUENCE IF NOT EXISTS seq_iban_pagopa_temp START WITH 1 INCREMENT BY 1 NO CYCLE;
+
+CREATE TABLE IBAN_PAGOPA_TEMP (
+    id                  BIGINT DEFAULT nextval('seq_iban_pagopa_temp') PRIMARY KEY,
+    cod_intermediario   VARCHAR(35) NOT NULL,
+    ci_fiscal_code      VARCHAR(35) NOT NULL,
+    ci_name             VARCHAR(255),
+    iban                VARCHAR(35) NOT NULL,
+    status              VARCHAR(255),
+    validity_date       TIMESTAMP WITH TIME ZONE,
+    description         VARCHAR(512),
+    label               VARCHAR(1024),
+    check_stato         VARCHAR(35),
+    check_motivo        VARCHAR(1024)
+);
+
+-- Indexes
+CREATE INDEX idx_ipt_ci_fiscal_code ON IBAN_PAGOPA_TEMP(ci_fiscal_code);
+CREATE INDEX idx_ipt_iban ON IBAN_PAGOPA_TEMP(iban);
+CREATE INDEX idx_ipt_cod_intermediario ON IBAN_PAGOPA_TEMP(cod_intermediario);
+CREATE INDEX idx_ipt_check_stato ON IBAN_PAGOPA_TEMP(check_stato);
+CREATE INDEX idx_ipt_fiscal_code_iban ON IBAN_PAGOPA_TEMP(ci_fiscal_code, iban);
+
+-- Comments
+COMMENT ON TABLE IBAN_PAGOPA_TEMP IS 'Tabella temporanea per IBAN scaricati da pagoPA durante il batch di verifica';
+COMMENT ON COLUMN IBAN_PAGOPA_TEMP.cod_intermediario IS 'Codice intermediario utilizzato nella richiesta (brokerCode)';
+COMMENT ON COLUMN IBAN_PAGOPA_TEMP.ci_fiscal_code IS 'Codice fiscale del dominio (ciFiscalCode)';
+COMMENT ON COLUMN IBAN_PAGOPA_TEMP.check_stato IS 'Esito verifica: OK, NON_CENSITO, INFO_DIVERSE, NON_ATTIVO';
+COMMENT ON COLUMN IBAN_PAGOPA_TEMP.check_motivo IS 'Descrizione testuale della discrepanza';

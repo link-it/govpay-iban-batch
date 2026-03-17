@@ -1,7 +1,43 @@
+2026-03-06  Giuliano Pintori <pintori@link.it>
+
+	* [Build]
+	Esclusione driver JDBC dal fat jar.
+	I driver JDBC (PostgreSQL, H2, Oracle, MySQL, SQL Server) non vengono più inclusi nel fat jar,
+	riducendo la dimensione di circa 15MB. I driver devono essere forniti esternamente a runtime
+	tramite la proprietà 'loader.path' (PropertiesLauncher).
+	Modifiche:
+	- pom.xml: scope driver JDBC da 'runtime' a 'provided', esclusione esplicita nel spring-boot-maven-plugin
+	- pom.xml: aggiunto layout ZIP (PropertiesLauncher) per supporto loader.path
+	- docker/commons/entrypoint.sh: aggiunto export LOADER_PATH verso directory driver JDBC
+	- avvia_batch_iban.sh: aggiunto script di avvio locale con -Dloader.path=./jdbc-drivers
+	- docker/jdbc-drivers/README.md: documentazione driver JDBC supportati
+	- README.md: aggiornata documentazione con sezione Driver JDBC e istruzioni esecuzione
+
+2026-02-25  Giuliano Pintori <pintori@link.it>
+
+	* [EventoIbanMapper]
+	Corretto calcolo durata evento: ora espresso in millisecondi.
+
+	* [ProjectSetup]
+	Aggiornato govpay-bom a 1.1.2.
+	Aggiornato govpay-common a 1.0.0.
+
+2026-02-19  Giuliano Pintori <pintori@link.it>
+
+	* [BatchController]
+	Implementato metodo clearCache() per svuotare le cache dei connettori
+	e delle istanze API client pagoPA.
+
+2026-02-10  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Adottato govpay-bom 1.1.0 come parent POM (Spring Boot 3.5.9).
+	Aggiunta dipendenza govpay-common 1.0.0-SNAPSHOT.
+
 2026-02-06  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]
 	Creazione repository
 	Creato repository iniziale per il progetto govpay-iban-batch.
 	Configurazione base Spring Boot 3.5.7 con Java 21.
-	Importata pipeline di validazione e rilascio CI/CD dal progetto govpay-fdr-batch.
+	Importata pipeline di validazione e rilascio CI/CD dal progetto govpay-iban-batch.

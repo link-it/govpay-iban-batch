@@ -1,0 +1,75 @@
+FROM eclipse-temurin:21-jre-alpine
+
+ARG govpay_iban_fullversion=local
+ARG govpay_iban_home=/opt/govpay-iban
+ARG govpay_iban_log=/var/log/govpay-iban
+
+LABEL maintainer="Link.it s.r.l."
+LABEL description="GovPay IBAN (Verifica attivazione IBAN) Batch Processor - Local Build"
+LABEL govpay.iban.version="${govpay_iban_fullversion}"
+USER root
+
+ENV GOVPAY_IBAN_FULLVERSION=${govpay_iban_fullversion} \
+GOVPAY_IBAN_LOGDIR=${govpay_iban_log} \
+GOVPAY_IBAN_HOME=${govpay_iban_home} \
+HSQLDB_FULLVERSION=2.7.4 \
+TZ=Europe/Rome
+
+
+RUN set -eux; \
+apk update; \
+apk upgrade; \
+apk add --no-cache bash curl tar unzip netcat-openbsd tzdata; \
+rm -rf /var/cache/apk/*; \
+echo "${TZ}" > /etc/timezone; \
+addgroup -S govpay ; \
+adduser -S -G govpay govpay; \
+mkdir -p ${GOVPAY_IBAN_HOME} ${GOVPAY_IBAN_LOGDIR} /opt/sql /opt/jdbc-drivers; \
+chown -R govpay:govpay ${GOVPAY_IBAN_HOME} ${GOVPAY_IBAN_LOGDIR} /opt/sql
+
+WORKDIR ${GOVPAY_IBAN_HOME}
+
+# Copy JAR from local build (buildcontext/)
+COPY govpay-iban-batch.jar ${GOVPAY_IBAN_HOME}/govpay-iban-batch.jar
+
+# Copy SQL scripts (buildcontext/)
+COPY sql /opt/sql
+
+# Download HSQLDB
+RUN set -eux; \
+chown govpay:govpay ${GOVPAY_IBAN_HOME}/govpay-iban-batch.jar; \
+chown -R govpay:govpay /opt/sql; \
+curl -kL -sS -q -o /var/tmp/hsqldb-${HSQLDB_FULLVERSION}.zip https://sourceforge.net/projects/hsqldb/files/hsqldb/hsqldb_2_7/hsqldb-${HSQLDB_FULLVERSION}.zip/download; \
+unzip -q -d /opt /var/tmp/hsqldb-${HSQLDB_FULLVERSION}.zip hsqldb-${HSQLDB_FULLVERSION}/hsqldb/lib/*; \
+rm -f /var/tmp/hsqldb-${HSQLDB_FULLVERSION}.zip
+
+# Copy entrypoint and initialization scripts
+COPY commons/entrypoint.sh commons/init_iban_db.sh /usr/local/bin/
+RUN chown -R govpay:0 /usr/local/bin/entrypoint.sh /usr/local/bin/init_iban_db.sh ${GOVPAY_IBAN_HOME} ${GOVPAY_IBAN_LOGDIR} /opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb /opt/sql \
+&& chmod -Rf g+rwX ${GOVPAY_IBAN_HOME} ${GOVPAY_IBAN_LOGDIR} /opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb/ /opt/sql/ \
+&& chmod ug=rx /usr/local/bin/entrypoint.sh /usr/local/bin/init_iban_db.sh
+
+
+USER govpay
+
+ENV SPRING_BATCH_JOB_ENABLED=false \
+    GOVPAY_BATCH_ENABLED=true \
+    GOVPAY_BATCH_THREAD_POOL_SIZE=5 \
+    GOVPAY_BATCH_HEADERS_CHUNK_SIZE=1 \
+    GOVPAY_BATCH_METADATA_CHUNK_SIZE=100 \
+    GOVPAY_BATCH_PAYMENTS_CHUNK_SIZE=50 \
+    GOVPAY_BATCH_SKIP_LIMIT=10 \
+    GOVPAY_BATCH_STALE_THRESHOLD_MINUTES=120 \
+    MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+    SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=20000 \
+    SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT=10000 \
+    SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=600000 \
+    SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=2 \
+    SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10 \
+    LOGGING_FILE_NAME=${GOVPAY_IBAN_LOGDIR}/govpay-iban.log \
+    LOGGING_DIRECTORYPATH=${GOVPAY_IBAN_LOGDIR} \
+    LOGGING_FILEPREFIX=govpay-iban
+
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD []
