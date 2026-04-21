@@ -18,6 +18,9 @@ import it.govpay.common.configurazione.service.ConfigurazioneService;
 import it.govpay.common.gde.AbstractGdeService;
 import it.govpay.common.gde.GdeEventInfo;
 import it.govpay.common.gde.GdeUtils;
+import it.govpay.common.configurazione.model.GdeInterfaccia;
+import it.govpay.common.configurazione.model.Giornale;
+import it.govpay.gde.client.beans.ComponenteEvento;
 import it.govpay.gde.client.beans.NuovoEvento;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.gde.mapper.EventoIbanMapper;
@@ -55,6 +58,11 @@ public class GdeService extends AbstractGdeService {
     @Override
     protected String getGdeEndpoint() {
         return configurazioneService.getServizioGDE().getUrl() + "/eventi";
+    }
+
+    @Override
+    protected GdeInterfaccia getConfigurazioneComponente(ComponenteEvento componente, Giornale giornale) {
+        return GdeUtils.getConfigurazioneComponente(componente, giornale);
     }
 
     @Override
