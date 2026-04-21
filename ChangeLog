@@ -1,3 +1,21 @@
+2026-04-21  Giuliano Pintori <pintori@link.it>
+
+	* [GdeService]
+	Aggiunto metodo getConfigurazioneComponente con delega a GdeUtils.
+
+	* [Pipeline]
+	Aggiornata gestione cache OWASP: chiave basata sulla data con NOUPDATE_FLAG
+	per skippare l'update NVD se la cache è della stessa giornata.
+	Aggiornata action upload-artifact a v7.
+	Aggiunto workflow refresh-owasp-db per aggiornamento notturno cache NVD.
+
+	* [Database]
+	Aggiunti script di svecchiamento tabelle Spring Batch (spring-batch-cleanup.sql)
+	per tutti i database supportati (PostgreSQL, MySQL, Oracle, SQL Server, HSQLDB).
+
+	* [ProjectSetup]
+	Aggiornato govpay-bom a 1.1.3-SNAPSHOT.
+
 2026-03-06  Giuliano Pintori <pintori@link.it>
 
 	* [Build]
