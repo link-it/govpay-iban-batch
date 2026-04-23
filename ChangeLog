@@ -6,8 +6,11 @@
 	* [Pipeline]
 	Aggiornata gestione cache OWASP: chiave basata sulla data con NOUPDATE_FLAG
 	per skippare l'update NVD se la cache è della stessa giornata.
-	Aggiornata action upload-artifact a v7.
+	Aggiornata action upload-artifact a v7 e download-artifact a v7.
 	Aggiunto workflow refresh-owasp-db per aggiornamento notturno cache NVD.
+	Aggiunto job osv-scan con Google OSV Scanner.
+	Ristrutturato job release: tutti i report (OWASP, JaCoCo, OSV, licenze)
+	collezionati in un unico release-reports ZIP.
 
 	* [Database]
 	Aggiunti script di svecchiamento tabelle Spring Batch (spring-batch-cleanup.sql)
