@@ -1,3 +1,15 @@
+2026-05-05  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Avanzata versione del progetto a 1.0.1.
+	Aggiornato govpay-bom a 1.1.3 e govpay-common a 1.1.2.
+
+	* [Pipeline]
+	Aggiunto job sbom per generazione SBOM CycloneDX (json + xml) tramite
+	cyclonedx-maven-plugin. SBOM incluso nel release-reports ZIP sotto reports/sbom.
+	Job condizionato da push su main/tag o vars.FORCE_SBOM_JOB; disattivabile
+	con vars.DISABLE_SBOM_JOB.
+
 2026-04-21  Giuliano Pintori <pintori@link.it>
 
 	* [GdeService]
