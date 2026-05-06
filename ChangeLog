@@ -1,3 +1,10 @@
+2026-05-06  Giuliano Pintori <pintori@link.it>
+
+	* [Pipeline]
+	Fix step "Zip SQL files" del job release: aggiunto mkdir -p target per
+	creare la cartella di output prima dello zip (il job parte da un checkout
+	pulito senza target/).
+
 2026-05-05  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]
