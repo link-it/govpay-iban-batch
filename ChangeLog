@@ -1,3 +1,14 @@
+2026-05-12  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Avanzata versione del progetto a 1.0.2.
+
+	* [Configuration]
+	Rimosse direttive logging.level.* da application.properties.
+	La configurazione di logging è demandata al runtime tramite profili
+	dedicati: livelli DEBUG per it.govpay.iban.batch e org.springframework.batch
+	spostati in application-dev.properties.
+
 2026-05-06  Giuliano Pintori <pintori@link.it>
 
 	* [Pipeline]
