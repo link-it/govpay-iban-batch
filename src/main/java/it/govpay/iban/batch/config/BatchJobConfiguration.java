@@ -8,10 +8,10 @@ import it.govpay.iban.batch.step2.IbanCheckWriter;
 import it.govpay.iban.batch.tasklet.CleanupIbanTempTasklet;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.Step;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.core.job.parameters.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.context.annotation.Bean;
@@ -73,13 +73,14 @@ public class BatchJobConfiguration {
     @Bean
     public Step ibanCheckAcquisitionStep(
     	it.govpay.iban.batch.partitioner.IntermediarioPartitioner intermediarioPartitioner,
-        Step ibanCheckWorkerStep
+        Step ibanCheckWorkerStep,
+        SimpleAsyncTaskExecutor taskExecutor
     ) {
         return new StepBuilder("ibanCheckAcquisitionStep", jobRepository)
         	.partitioner("ibanCheckAcquisitionStep", intermediarioPartitioner)
             .step(ibanCheckWorkerStep)
             .gridSize(batchProperties.getThreadPoolSize()) // Numero di partizioni parallele
-            .taskExecutor(taskExecutor())
+            .taskExecutor(taskExecutor)
             .build();
     }
 
@@ -99,15 +100,5 @@ public class BatchJobConfiguration {
             .writer(ibanCheckWriter)
             .listener(ibanCheckReader) // Register reader as step listener for queue reset
             .build();
-    }
-
-    /**
-     * Task executor for parallel processing in Step 2
-     */
-    @Bean
-    public SimpleAsyncTaskExecutor taskExecutor() {
-        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("iban-batch-");
-        executor.setConcurrencyLimit(batchProperties.getThreadPoolSize());
-        return executor;
     }
 }

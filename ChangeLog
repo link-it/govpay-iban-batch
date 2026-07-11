@@ -1,3 +1,28 @@
+2026-07-11  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Avanzata versione del progetto a 2.0.0.
+	Aggiornato govpay-bom a 2.0.1 e govpay-common a 2.0.0.
+
+	* [Migrazione]
+	Migrazione a Spring Boot 4.1 / Spring Framework 7 (Spring Batch 6,
+	Hibernate 7, Jackson 3).
+	- Jackson 2 -> 3: migrazione al namespace tools.jackson; gli ObjectMapper
+	  custom (WebConfig, IbanPagopaApiClientConfig) sono ora costruiti tramite
+	  JsonMapper.builder() (l'ObjectMapper e' immutabile). Le feature enum/date
+	  sono passate a EnumFeature/DateTimeFeature.
+	- Spring 7: sostituito MappingJackson2HttpMessageConverter con
+	  JacksonJsonHttpMessageConverter in IbanPagopaApiService.
+	- Spring Batch 6: aggiornati i package spostati (core.job.*, core.step.*,
+	  core.job.parameters.*, core.listener.*, infrastructure.item.*,
+	  infrastructure.repeat.*); JobConcurrencyService usa solo JobRepository,
+	  JobExecutionHelper e AbstractBatchController usano JobOperator/JobRepository.
+	- Spring Boot 4: @EntityScan spostato in boot.persistence.autoconfigure;
+	  il bean taskExecutor e' stato spostato in BatchInfraConfig per evitare un
+	  ciclo di creazione bean con la entityManagerFactoryBuilder.
+	- OpenAPI Generator: attivati useSpringBoot4 e useJackson3.
+	- Hibernate 7: sostituito hibernate-jpamodelgen con hibernate-processor.
+
 2026-05-12  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]
