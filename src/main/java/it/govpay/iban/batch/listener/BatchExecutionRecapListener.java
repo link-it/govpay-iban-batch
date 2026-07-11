@@ -11,9 +11,9 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobExecutionListener;
-import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.listener.JobExecutionListener;
+import org.springframework.batch.core.step.StepExecution;
 import org.springframework.stereotype.Component;
 
 import it.govpay.common.mail.MailInfo;
@@ -46,7 +46,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
         jobStartTimestamp = LocalDateTime.now().format(FILE_TIMESTAMP_FORMATTER);
         log.info("=".repeat(80));
         log.info("INIZIO BATCH CONTROLLO IBAN");
-        log.info("Job ID: {}", jobExecution.getJobId());
+        log.info("Job ID: {}", jobExecution.getJobInstanceId());
         log.info("Avvio: {}", LocalDateTime.now().format(TIME_FORMATTER));
         log.info("=".repeat(80));
     }

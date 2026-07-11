@@ -213,7 +213,7 @@ class IbanPagopaApiServiceTest {
         injectMockApi();
 
         when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
-                .thenReturn(new ResponseEntity<>(null, HttpStatus.OK));
+                .thenReturn(new ResponseEntity<>((CIIbansResponse) null, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
 

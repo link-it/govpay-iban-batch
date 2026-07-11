@@ -13,10 +13,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.ExitStatus;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobInstance;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.job.JobInstance;
+import org.springframework.batch.core.job.parameters.JobParameters;
+import org.springframework.batch.core.step.StepExecution;
 
 import it.govpay.iban.batch.config.FileStorageConfig;
 import it.govpay.iban.batch.mail.MailService;
@@ -37,7 +37,7 @@ class BatchExecutionRecapListenerTest {
 
     private JobExecution createJobExecution() {
         JobInstance jobInstance = new JobInstance(1L, "ibanCheckJob");
-        JobExecution execution = new JobExecution(jobInstance, 1L, new JobParameters());
+        JobExecution execution = new JobExecution(1L, jobInstance, new JobParameters());
         execution.setStatus(BatchStatus.COMPLETED);
         execution.setStartTime(LocalDateTime.now().minusMinutes(5));
         execution.setEndTime(LocalDateTime.now());

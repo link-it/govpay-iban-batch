@@ -17,11 +17,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobInstance;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.StepExecution;
-import org.springframework.batch.item.Chunk;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.job.JobInstance;
+import org.springframework.batch.core.job.parameters.JobParameters;
+import org.springframework.batch.core.step.StepExecution;
+import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import it.govpay.iban.batch.Costanti;
@@ -69,7 +69,7 @@ class IbanCheckWriterTest {
 
     private StepExecution createStepExecution() {
         JobInstance jobInstance = new JobInstance(1L, "ibanCheckJob");
-        JobExecution jobExecution = new JobExecution(jobInstance, 1L, new JobParameters());
+        JobExecution jobExecution = new JobExecution(1L, jobInstance, new JobParameters());
         return new StepExecution("ibanCheckWorkerStep", jobExecution);
     }
 

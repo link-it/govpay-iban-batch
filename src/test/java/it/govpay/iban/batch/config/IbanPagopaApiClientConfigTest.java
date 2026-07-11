@@ -12,9 +12,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
 
 class IbanPagopaApiClientConfigTest {
 
@@ -35,17 +35,17 @@ class IbanPagopaApiClientConfigTest {
     @Test
     void createPagoPAObjectMapper_shouldNotWriteDatesAsTimestamps() {
         ObjectMapper mapper = config.createPagoPAObjectMapper();
-        assertFalse(mapper.isEnabled(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
+        assertFalse(mapper.isEnabled(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS));
     }
 
     @Test
     void createPagoPAObjectMapper_shouldWriteDatesWithZoneId() {
         ObjectMapper mapper = config.createPagoPAObjectMapper();
-        assertTrue(mapper.isEnabled(SerializationFeature.WRITE_DATES_WITH_ZONE_ID));
+        assertTrue(mapper.isEnabled(DateTimeFeature.WRITE_DATES_WITH_ZONE_ID));
     }
 
     @Test
-    void createPagoPAObjectMapper_shouldSerializeOffsetDateTime() throws JsonProcessingException {
+    void createPagoPAObjectMapper_shouldSerializeOffsetDateTime() throws JacksonException {
         ObjectMapper mapper = config.createPagoPAObjectMapper();
 
         OffsetDateTime dateTime = OffsetDateTime.of(2025, 6, 15, 10, 30, 0, 0, ZoneOffset.UTC);
@@ -58,7 +58,7 @@ class IbanPagopaApiClientConfigTest {
     }
 
     @Test
-    void createPagoPAObjectMapper_shouldDeserializeOffsetDateTimeWithVariableMillis() throws JsonProcessingException {
+    void createPagoPAObjectMapper_shouldDeserializeOffsetDateTimeWithVariableMillis() throws JacksonException {
         ObjectMapper mapper = config.createPagoPAObjectMapper();
 
         // 3-digit millis
@@ -73,7 +73,7 @@ class IbanPagopaApiClientConfigTest {
     }
 
     @Test
-    void createPagoPAObjectMapper_shouldDeserializeOffsetDateTimeWithoutMillis() throws JsonProcessingException {
+    void createPagoPAObjectMapper_shouldDeserializeOffsetDateTimeWithoutMillis() throws JacksonException {
         ObjectMapper mapper = config.createPagoPAObjectMapper();
 
         OffsetDateTime dt = mapper.readValue("\"2025-06-15T10:30:00+02:00\"", OffsetDateTime.class);

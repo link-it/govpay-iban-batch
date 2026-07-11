@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -86,10 +86,10 @@ public class IbanPagopaApiService {
         return apiCache.computeIfAbsent(codConnettore, code -> {
             RestTemplate restTemplate = connettoreService.getRestTemplate(code);
 
-            // Customize ObjectMapper for pagoPA date handling
-            MappingJackson2HttpMessageConverter converter =
-                new MappingJackson2HttpMessageConverter(ibanPagopaApiClientConfig.createPagoPAObjectMapper());
-            restTemplate.getMessageConverters().removeIf(MappingJackson2HttpMessageConverter.class::isInstance);
+            // Customize JsonMapper (Jackson 3) for pagoPA date handling
+            JacksonJsonHttpMessageConverter converter =
+                new JacksonJsonHttpMessageConverter(ibanPagopaApiClientConfig.createPagoPAObjectMapper());
+            restTemplate.getMessageConverters().removeIf(JacksonJsonHttpMessageConverter.class::isInstance);
             restTemplate.getMessageConverters().add(0, converter);
 
             Connettore connettore = connettoreService.getConnettore(code);

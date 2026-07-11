@@ -7,7 +7,7 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=link-it_govpay-iban-batch&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=link-it_govpay-iban-batch)
 [![Docker Hub](https://img.shields.io/docker/v/linkitaly/govpay-iban-batch?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/linkitaly/govpay-iban-batch)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://raw.githubusercontent.com/link-it/govpay-iban-batch/main/LICENSE)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
 
 ## Sommario
 

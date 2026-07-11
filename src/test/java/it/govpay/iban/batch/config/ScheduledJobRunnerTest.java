@@ -15,10 +15,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.BatchStatus;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobInstance;
-import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.job.JobExecution;
+import org.springframework.batch.core.job.JobInstance;
+import org.springframework.batch.core.job.parameters.JobParameters;
 
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.batch.runner.JobExecutionHelper.PreExecutionCheckResult;
@@ -43,7 +43,7 @@ class ScheduledJobRunnerTest {
 
     private JobExecution createJobExecution(BatchStatus status) {
         JobInstance jobInstance = new JobInstance(1L, Costanti.IBAN_CHECK_JOB_NAME);
-        JobExecution execution = new JobExecution(jobInstance, 1L, new JobParameters());
+        JobExecution execution = new JobExecution(1L, jobInstance, new JobParameters());
         execution.setStatus(status);
         return execution;
     }
