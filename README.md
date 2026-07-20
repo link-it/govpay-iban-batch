@@ -61,6 +61,24 @@ java -Dloader.path=./jdbc-drivers -jar target/govpay-iban-batch.jar
 java -Dloader.path=./jdbc-drivers -jar target/govpay-iban-batch.jar --spring.profiles.active=cron
 ```
 
+## Metriche Prometheus
+
+Gli endpoint `/actuator/health` e `/actuator/prometheus` rispondono di default sulla **stessa porta**
+dell'applicazione (nessuna porta management separata è configurata). Per esporli su una porta dedicata
+impostare:
+
+```properties
+management.server.port=[Porta dedicata per gli endpoint actuator]
+```
+
+oppure, in ambiente Docker, la variabile d'ambiente equivalente:
+
+```bash
+MANAGEMENT_SERVER_PORT=[Porta dedicata per gli endpoint actuator]
+```
+
+Se non valorizzata, gli endpoint restano sulla porta applicativa.
+
 ## Configurazione Docker
 
 Con Docker la variabile d'ambiente `LOADER_PATH` viene impostata automaticamente dall'entrypoint
