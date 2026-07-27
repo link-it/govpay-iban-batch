@@ -20,11 +20,17 @@ public class Costanti {
 	// Operazioni IBAN API (da openapi_backoffice_external_ec.json)
     public static final String OPERATION_GET_ALL_IBANS = "getAllIbans";
 
+    // Operazione anagrafica Enti Creditori (stesso file spec)
+    public static final String OPERATION_GET_BROKER_INSTITUTIONS = "getBrokerInstitutions";
+
     // Non sono URI completi (mancano protocollo e host) ma template che vengono
     // combinati con il baseUrl del connettore configurato in DB.
     // Soppressione S1075: path template API fissi, non URI configurabili
     @SuppressWarnings("java:S1075")
     public static final String PATH_GET_ALL_IBANS = "/brokers/{brokerCode}/ibans";
+
+    @SuppressWarnings("java:S1075")
+    public static final String PATH_GET_BROKER_INSTITUTIONS = "/brokers/{brokerCode}/creditor_institutions";
 
     public static final String CHECK_OK = "OK";
     public static final String CHECK_NON_CENSITO = "NON_CENSITO";

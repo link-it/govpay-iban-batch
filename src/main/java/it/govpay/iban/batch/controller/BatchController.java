@@ -20,7 +20,7 @@ import it.govpay.common.batch.dto.NextExecutionInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
-import it.govpay.iban.batch.service.IbanPagopaApiService;
+import it.govpay.iban.batch.config.PagoPaApiClientFactory;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -33,21 +33,21 @@ public class BatchController extends AbstractBatchController {
 
     private final Job ibanCheckJob;
     private final ConnettoreService connettoreService;
-    private final IbanPagopaApiService ibanPagopaApiService;
+    private final PagoPaApiClientFactory pagoPaApiClientFactory;
 
     public BatchController(
             JobExecutionHelper jobExecutionHelper,
             JobRepository jobRepository,
             @Qualifier("ibanCheckJob") Job ibanCheckJob,
             ConnettoreService connettoreService,
-            IbanPagopaApiService ibanPagopaApiService,
+            PagoPaApiClientFactory pagoPaApiClientFactory,
             Environment environment,
             ZoneId applicationZoneId,
             @Value("${scheduler.ibanCheckJob.fixedDelayString:7200000}") long schedulerIntervalMillis) {
         super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis);
         this.ibanCheckJob = ibanCheckJob;
         this.connettoreService = connettoreService;
-        this.ibanPagopaApiService = ibanPagopaApiService;
+        this.pagoPaApiClientFactory = pagoPaApiClientFactory;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class BatchController extends AbstractBatchController {
     protected ResponseEntity<String> clearCache() {
         log.info("Svuotamento cache in corso...");
         connettoreService.clearCache();
-        ibanPagopaApiService.clearApiCache();
+        pagoPaApiClientFactory.clearApiCache();
         log.info("Cache svuotate con successo");
         return ResponseEntity.ok("Cache svuotate con successo");
     }

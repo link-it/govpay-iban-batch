@@ -4,32 +4,22 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
-import it.govpay.common.client.model.Connettore;
-import it.govpay.common.client.service.ConnettoreService;
-import it.govpay.common.entity.IntermediarioEntity;
-import it.govpay.common.repository.IntermediarioRepository;
 import it.govpay.iban.batch.config.BatchProperties;
-import it.govpay.iban.batch.config.IbanPagopaApiClientConfig;
+import it.govpay.iban.batch.config.PagoPaApiClientFactory;
 import it.govpay.iban.batch.dto.IbanPagopa;
 import it.govpay.iban.batch.gde.service.GdeService;
-import it.govpay.pagopa.backoffice.client.ApiClient;
-import it.govpay.pagopa.backoffice.client.api.ExternalApisApi;
 import it.govpay.pagopa.backoffice.client.model.CIIbansResource;
 import it.govpay.pagopa.backoffice.client.model.CIIbansResponse;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Service for interacting with pagoPA API.
- * Resolves the IBAN PagoPA connector per-domain via IntermediarioRepository,
+ * Resolves the IBAN PagoPA connector per-domain via {@link PagoPaApiClientFactory},
  * following the chain: IntermediarioEntity.codConnettoreBackofficeEc
  */
 @Service
@@ -38,76 +28,14 @@ public class IbanPagopaApiService {
 
     private final BatchProperties batchProperties;
     private final GdeService gdeService;
-    private final IntermediarioRepository intermediarioRepository;
-    private final ConnettoreService connettoreService;
-    private final IbanPagopaApiClientConfig ibanPagopaApiClientConfig;
-
-    /** Cache of ExternalApisApi instances keyed by connector code */
-    private final ConcurrentHashMap<String, ExternalApisApi> apiCache = new ConcurrentHashMap<>();
+    private final PagoPaApiClientFactory pagoPaApiClientFactory;
 
     public IbanPagopaApiService(BatchProperties batchProperties,
-                                ConnettoreService connettoreService,
-                                IntermediarioRepository intermediarioRepository,
                                 GdeService gdeService,
-                                IbanPagopaApiClientConfig ibanPagopaApiClientConfig) {
+                                PagoPaApiClientFactory pagoPaApiClientFactory) {
         this.batchProperties = batchProperties;
-        this.connettoreService = connettoreService;
-        this.intermediarioRepository = intermediarioRepository;
         this.gdeService = gdeService;
-        this.ibanPagopaApiClientConfig = ibanPagopaApiClientConfig;
-    }
-
-    /**
-     * Resolves the connector code for the given codIntermediario via IntermediarioRepository.
-     */
-    private String resolveConnectorCode(String codIntermediario) {
-        Optional<IntermediarioEntity> intermediarioOpt = intermediarioRepository.findByCodIntermediario(codIntermediario);
-        IntermediarioEntity intermediario = intermediarioOpt.orElseThrow(() ->
-            new IllegalStateException("Nessun intermediario trovato: " + codIntermediario));
-
-        String codConnettore = intermediario.getCodConnettoreBackofficeEc();
-        if (codConnettore == null || codConnettore.isBlank()) {
-            throw new IllegalStateException(
-                "Connettore IBAN check non configurato per l'intermediario " + intermediario.getCodIntermediario());
-        }
-
-        log.debug("Intermediario {} -> Connettore IBAN check: {}",
-                  intermediario.getCodIntermediario(), codConnettore);
-        return codConnettore;
-    }
-
-    /**
-     * Gets or creates an ExternalApisApi instance for the given intermediario.
-     * Uses a cache keyed by connector code to avoid creating duplicate instances
-     * for domains sharing the same intermediary.
-     */
-    private ExternalApisApi getOrCreateApi(String brokerCode) {
-        String codConnettore = resolveConnectorCode(brokerCode);
-        return apiCache.computeIfAbsent(codConnettore, code -> {
-            RestTemplate restTemplate = connettoreService.getRestTemplate(code);
-
-            // Customize JsonMapper (Jackson 3) for pagoPA date handling
-            JacksonJsonHttpMessageConverter converter =
-                new JacksonJsonHttpMessageConverter(ibanPagopaApiClientConfig.createPagoPAObjectMapper());
-            restTemplate.getMessageConverters().removeIf(JacksonJsonHttpMessageConverter.class::isInstance);
-            restTemplate.getMessageConverters().add(0, converter);
-
-            Connettore connettore = connettoreService.getConnettore(code);
-            ApiClient apiClient = new ApiClient(restTemplate);
-            apiClient.setBasePath(connettore.getUrl());
-
-            log.info("Creata istanza ExternalApisApi per connettore {} (URL: {})", code, connettore.getUrl());
-            return new ExternalApisApi(apiClient);
-        });
-    }
-
-    /**
-     * Returns the pagoPA base URL for the given intermediario (for GDE event tracking).
-     * Delegates to ConnettoreService which has its own internal caching.
-     */
-    private String getBaseUrl(String codIntermediario) {
-        String codConnettore = resolveConnectorCode(codIntermediario);
-        return connettoreService.getConnettore(codConnettore).getUrl();
+        this.pagoPaApiClientFactory = pagoPaApiClientFactory;
     }
 
 	private void logNoResponse(String codIntermediario, ResponseEntity<CIIbansResponse> lastResponseEntity,
@@ -177,7 +105,7 @@ public class IbanPagopaApiService {
             log.debug("Chiamata API per l'intermediario {} pagina {}", brokerCode, currentPage);
 
             ResponseEntity<CIIbansResponse> responseEntity =
-                getOrCreateApi(brokerCode).getBrokerIbansWithHttpInfo(
+                pagoPaApiClientFactory.getOrCreateApi(brokerCode).getBrokerIbansWithHttpInfo(
                 	brokerCode,
                 	Integer.valueOf(currentPage.intValue()),         // page
                     Integer.valueOf(batchProperties.getPageSize()),  // size
@@ -241,23 +169,14 @@ public class IbanPagopaApiService {
 	private void saveGetIbansKo(String codIntermediario, OffsetDateTime startTime,
 			ResponseEntity<CIIbansResponse> lastResponseEntity, RestClientException e) {
 		OffsetDateTime endTime = OffsetDateTime.now(ZoneOffset.UTC);
-		gdeService.saveGetIbansKo(codIntermediario, startTime, endTime, lastResponseEntity, e, getBaseUrl(codIntermediario));
+		gdeService.saveGetIbansKo(codIntermediario, startTime, endTime, lastResponseEntity, e, pagoPaApiClientFactory.getBaseUrl(codIntermediario));
 	}
 
 	private void saveGetIbansOk(String codIntermediario, OffsetDateTime startTime,
 			List<IbanPagopa> allIbans, ResponseEntity<CIIbansResponse> lastResponseEntity) {
 		OffsetDateTime endTime = OffsetDateTime.now(ZoneOffset.UTC);
-		gdeService.saveGetIbansOk(codIntermediario, startTime, endTime, allIbans.size(), lastResponseEntity, getBaseUrl(codIntermediario));
+		gdeService.saveGetIbansOk(codIntermediario, startTime, endTime, allIbans.size(), lastResponseEntity, pagoPaApiClientFactory.getBaseUrl(codIntermediario));
 	}
-
-    /**
-     * Svuota la cache delle istanze ExternalApisApi.
-     * Alla prossima invocazione verranno ricreate con i dati aggiornati dal DB.
-     */
-    public void clearApiCache() {
-        log.info("Pulizia cache ExternalApisApi ({} entries)", apiCache.size());
-        apiCache.clear();
-    }
 
     /**
      * Helper class to encapsulate the result of a page fetch operation.

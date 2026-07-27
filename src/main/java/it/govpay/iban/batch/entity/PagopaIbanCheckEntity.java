@@ -15,16 +15,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "IBAN_PAGOPA_TEMP")
+@Table(name = "PAGOPA_IBAN_CHECK")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class IbanPagopaTempEntity {
+public class PagopaIbanCheckEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "iban_pagopa_temp_seq")
-	@SequenceGenerator(name = "iban_pagopa_temp_seq", sequenceName = "seq_iban_pagopa_temp", allocationSize = 1)
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "pagopa_iban_check_seq")
+	@SequenceGenerator(name = "pagopa_iban_check_seq", sequenceName = "seq_pagopa_iban_check", allocationSize = 1)
 	private Long id;
 
 	@Column(name = "cod_intermediario", length = 35, nullable = false)

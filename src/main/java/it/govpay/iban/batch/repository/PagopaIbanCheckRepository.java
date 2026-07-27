@@ -5,15 +5,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import it.govpay.iban.batch.entity.IbanPagopaTempEntity;
+import it.govpay.iban.batch.entity.PagopaIbanCheckEntity;
 
 @Repository
-public interface IbanPagopaTempRepository extends JpaRepository<IbanPagopaTempEntity, Long> {
+public interface PagopaIbanCheckRepository extends JpaRepository<PagopaIbanCheckEntity, Long> {
     /**
-     * Delete all records from IBAN_PAGOPA_TEMP
+     * Delete all records from PAGOPA_IBAN_CHECK
      */
     @Modifying
-    @Query("DELETE FROM IbanPagopaTempEntity")
+    @Query("DELETE FROM PagopaIbanCheckEntity")
     void deleteAllRecords();
 
 }

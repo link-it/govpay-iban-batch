@@ -13,13 +13,13 @@ import org.springframework.batch.core.step.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 
-import it.govpay.iban.batch.repository.IbanPagopaTempRepository;
+import it.govpay.iban.batch.repository.PagopaIbanCheckRepository;
 
 @ExtendWith(MockitoExtension.class)
-class CleanupIbanTempTaskletTest {
+class CleanupPagopaIbanCheckTaskletTest {
 
     @Mock
-    private IbanPagopaTempRepository ibanTempRepository;
+    private PagopaIbanCheckRepository pagopaIbanCheckRepository;
 
     @Mock
     private StepContribution stepContribution;
@@ -27,31 +27,31 @@ class CleanupIbanTempTaskletTest {
     @Mock
     private ChunkContext chunkContext;
 
-    private CleanupIbanTempTasklet tasklet;
+    private CleanupPagopaIbanCheckTasklet tasklet;
 
     @BeforeEach
     void setUp() {
-        tasklet = new CleanupIbanTempTasklet(ibanTempRepository);
+        tasklet = new CleanupPagopaIbanCheckTasklet(pagopaIbanCheckRepository);
     }
 
     @Test
     void execute_shouldDeleteAllRecordsAndReturnFinished() {
-        when(ibanTempRepository.count()).thenReturn(42L);
+        when(pagopaIbanCheckRepository.count()).thenReturn(42L);
 
         RepeatStatus result = tasklet.execute(stepContribution, chunkContext);
 
         assertEquals(RepeatStatus.FINISHED, result);
-        verify(ibanTempRepository).count();
-        verify(ibanTempRepository).deleteAllRecords();
+        verify(pagopaIbanCheckRepository).count();
+        verify(pagopaIbanCheckRepository).deleteAllRecords();
     }
 
     @Test
     void execute_withNoRecords_shouldStillCallDeleteAndReturnFinished() {
-        when(ibanTempRepository.count()).thenReturn(0L);
+        when(pagopaIbanCheckRepository.count()).thenReturn(0L);
 
         RepeatStatus result = tasklet.execute(stepContribution, chunkContext);
 
         assertEquals(RepeatStatus.FINISHED, result);
-        verify(ibanTempRepository).deleteAllRecords();
+        verify(pagopaIbanCheckRepository).deleteAllRecords();
     }
 }

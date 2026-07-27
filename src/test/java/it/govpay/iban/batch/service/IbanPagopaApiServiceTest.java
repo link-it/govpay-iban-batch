@@ -1,12 +1,9 @@
 package it.govpay.iban.batch.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -14,8 +11,6 @@ import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,16 +19,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 
-import it.govpay.common.client.model.Connettore;
-import it.govpay.common.client.service.ConnettoreService;
-import it.govpay.common.entity.IntermediarioEntity;
-import it.govpay.common.repository.IntermediarioRepository;
 import it.govpay.iban.batch.config.BatchProperties;
-import it.govpay.iban.batch.config.IbanPagopaApiClientConfig;
+import it.govpay.iban.batch.config.PagoPaApiClientFactory;
 import it.govpay.iban.batch.dto.IbanPagopa;
 import it.govpay.iban.batch.gde.service.GdeService;
 import it.govpay.pagopa.backoffice.client.api.ExternalApisApi;
@@ -41,6 +31,12 @@ import it.govpay.pagopa.backoffice.client.model.CIIbansResource;
 import it.govpay.pagopa.backoffice.client.model.CIIbansResponse;
 import it.govpay.pagopa.backoffice.client.model.PageInfo;
 
+/**
+ * La risoluzione del connettore e la cache delle istanze {@link ExternalApisApi}
+ * sono state estratte in {@link PagoPaApiClientFactory} (vedi
+ * {@code PagoPaApiClientFactoryTest}). Qui si testa solo la logica propria di
+ * {@link IbanPagopaApiService}: paginazione, gestione errori, tracking GDE.
+ */
 @ExtendWith(MockitoExtension.class)
 class IbanPagopaApiServiceTest {
 
@@ -51,13 +47,7 @@ class IbanPagopaApiServiceTest {
     private GdeService gdeService;
 
     @Mock
-    private IntermediarioRepository intermediarioRepository;
-
-    @Mock
-    private ConnettoreService connettoreService;
-
-    @Mock
-    private IbanPagopaApiClientConfig ibanPagopaApiClientConfig;
+    private PagoPaApiClientFactory pagoPaApiClientFactory;
 
     @Mock
     private ExternalApisApi externalApisApi;
@@ -65,43 +55,15 @@ class IbanPagopaApiServiceTest {
     private IbanPagopaApiService service;
 
     private static final String COD_INTERMEDIARIO = "12345678901";
-    private static final String COD_CONNETTORE = "CONN_BACKOFFICE_EC";
 
     @BeforeEach
     void setUp() {
-        service = new IbanPagopaApiService(batchProperties, connettoreService,
-                intermediarioRepository, gdeService, ibanPagopaApiClientConfig);
+        service = new IbanPagopaApiService(batchProperties, gdeService, pagoPaApiClientFactory);
     }
 
-    private IntermediarioEntity createIntermediario(String codConnettore) {
-        return IntermediarioEntity.builder()
-                .codIntermediario(COD_INTERMEDIARIO)
-                .codConnettoreBackofficeEc(codConnettore)
-                .abilitato(true)
-                .build();
-    }
-
-    /**
-     * Injects the mock ExternalApisApi into the apiCache, bypassing getOrCreateApi() creation logic.
-     * Also stubs intermediarioRepository and connettoreService for resolveConnectorCode/getBaseUrl.
-     */
-    private void injectMockApi() {
-        // Inject mock into apiCache
-        @SuppressWarnings("unchecked")
-        ConcurrentHashMap<String, ExternalApisApi> apiCache =
-                (ConcurrentHashMap<String, ExternalApisApi>) ReflectionTestUtils.getField(service, "apiCache");
-        apiCache.put(COD_CONNETTORE, externalApisApi);
-
-        // Stub resolveConnectorCode (used by getOrCreateApi cache lookup and getBaseUrl)
-        lenient().when(intermediarioRepository.findByCodIntermediario(COD_INTERMEDIARIO))
-                .thenReturn(Optional.of(createIntermediario(COD_CONNETTORE)));
-
-        // Stub getBaseUrl -> connettoreService.getConnettore
-        Connettore connettore = new Connettore();
-        connettore.setUrl("https://api.pagopa.it");
-        lenient().when(connettoreService.getConnettore(COD_CONNETTORE)).thenReturn(connettore);
-
-        // Stub pageSize
+    private void stubApi() {
+        lenient().when(pagoPaApiClientFactory.getOrCreateApi(COD_INTERMEDIARIO)).thenReturn(externalApisApi);
+        lenient().when(pagoPaApiClientFactory.getBaseUrl(COD_INTERMEDIARIO)).thenReturn("https://api.pagopa.it");
         lenient().when(batchProperties.getPageSize()).thenReturn(1000);
     }
 
@@ -129,37 +91,25 @@ class IbanPagopaApiServiceTest {
         return response;
     }
 
-    // ============ Validation tests (existing) ============
+    // ============ Propagazione errori dal client factory ============
 
     @Test
-    void getAllIbans_withNoIntermediario_shouldThrow() {
-        when(intermediarioRepository.findByCodIntermediario(COD_INTERMEDIARIO))
-                .thenReturn(Optional.empty());
+    void getAllIbans_whenFactoryThrowsIllegalState_shouldWrapInRestClientException() {
+        when(pagoPaApiClientFactory.getOrCreateApi(COD_INTERMEDIARIO))
+                .thenThrow(new IllegalStateException("Nessun intermediario trovato: " + COD_INTERMEDIARIO));
 
-        assertThrows(IllegalStateException.class, () -> service.getAllIbans(COD_INTERMEDIARIO));
-    }
-
-    @Test
-    void getAllIbans_withNullConnettoreCode_shouldThrow() {
-        when(intermediarioRepository.findByCodIntermediario(COD_INTERMEDIARIO))
-                .thenReturn(Optional.of(createIntermediario(null)));
-
-        assertThrows(IllegalStateException.class, () -> service.getAllIbans(COD_INTERMEDIARIO));
-    }
-
-    @Test
-    void getAllIbans_withBlankConnettoreCode_shouldThrow() {
-        when(intermediarioRepository.findByCodIntermediario(COD_INTERMEDIARIO))
-                .thenReturn(Optional.of(createIntermediario("   ")));
-
-        assertThrows(IllegalStateException.class, () -> service.getAllIbans(COD_INTERMEDIARIO));
+        // fetchIbansPage's generic catch(Exception) wraps any failure (including
+        // connector-resolution errors from the factory) into a RestClientException.
+        RestClientException thrown = assertThrows(RestClientException.class,
+                () -> service.getAllIbans(COD_INTERMEDIARIO));
+        assertTrue(thrown.getCause() instanceof IllegalStateException);
     }
 
     // ============ Single page success ============
 
     @Test
     void getAllIbans_singlePage_shouldReturnIbansAndCallGdeOk() throws Exception {
-        injectMockApi();
+        stubApi();
 
         CIIbansResource iban1 = createIbanResource("IT60X0542811101000000123456", "01234567890", "Comune A");
         CIIbansResource iban2 = createIbanResource("IT60X0542811101000000789012", "09876543210", "Comune B");
@@ -186,7 +136,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_multiPage_shouldPaginateAndReturnAll() throws Exception {
-        injectMockApi();
+        stubApi();
 
         CIIbansResource iban1 = createIbanResource("IT11111111111111111111111111", "01234567890", "Comune A");
         CIIbansResponse page1 = createResponse(List.of(iban1), 1, 2);
@@ -210,7 +160,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_nullBody_shouldReturnEmptyList() throws Exception {
-        injectMockApi();
+        stubApi();
 
         when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
                 .thenReturn(new ResponseEntity<>((CIIbansResponse) null, HttpStatus.OK));
@@ -225,7 +175,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_emptyIbansList_shouldReturnEmptyList() throws Exception {
-        injectMockApi();
+        stubApi();
 
         CIIbansResponse response = createResponse(List.of(), 1, 1);
         when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
@@ -240,7 +190,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_nullIbansField_shouldReturnEmptyList() throws Exception {
-        injectMockApi();
+        stubApi();
 
         CIIbansResponse response = new CIIbansResponse();
         response.setIbans(null);
@@ -261,7 +211,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_resourceAccessExceptionClosed_shouldReturnEmptyList() throws Exception {
-        injectMockApi();
+        stubApi();
 
         when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
                 .thenThrow(new ResourceAccessException("I/O error: connection closed"));
@@ -277,7 +227,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_resourceAccessExceptionGeneric_shouldThrowAndCallGdeKo() throws Exception {
-        injectMockApi();
+        stubApi();
 
         when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
                 .thenThrow(new ResourceAccessException("I/O error: connection timeout"));
@@ -291,7 +241,7 @@ class IbanPagopaApiServiceTest {
 
     @Test
     void getAllIbans_genericException_shouldWrapInRestClientExceptionAndCallGdeKo() throws Exception {
-        injectMockApi();
+        stubApi();
 
         when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
                 .thenThrow(new RuntimeException("Unexpected error"));
@@ -303,33 +253,11 @@ class IbanPagopaApiServiceTest {
         verify(gdeService).saveGetIbansKo(eq(COD_INTERMEDIARIO), any(), any(), any(), any(), eq("https://api.pagopa.it"));
     }
 
-    // ============ API cache reuse ============
-
-    @Test
-    void getAllIbans_calledTwice_shouldReuseApiFromCache() throws Exception {
-        injectMockApi();
-
-        CIIbansResponse response = createResponse(List.of(), 1, 1);
-        // Use lenient since called twice
-        lenient().when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
-                .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
-
-        service.getAllIbans(COD_INTERMEDIARIO);
-        service.getAllIbans(COD_INTERMEDIARIO);
-
-        // apiCache should still have exactly 1 entry (same mock reused)
-        @SuppressWarnings("unchecked")
-        ConcurrentHashMap<String, ExternalApisApi> apiCache =
-                (ConcurrentHashMap<String, ExternalApisApi>) ReflectionTestUtils.getField(service, "apiCache");
-        assertEquals(1, apiCache.size());
-        assertEquals(externalApisApi, apiCache.get(COD_CONNETTORE));
-    }
-
     // ============ convertIban mapping ============
 
     @Test
     void getAllIbans_shouldMapAllFieldsCorrectly() throws Exception {
-        injectMockApi();
+        stubApi();
 
         OffsetDateTime validityDate = OffsetDateTime.now();
         CIIbansResource resource = new CIIbansResource();

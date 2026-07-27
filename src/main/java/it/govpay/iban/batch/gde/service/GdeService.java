@@ -24,6 +24,7 @@ import it.govpay.gde.client.beans.ComponenteEvento;
 import it.govpay.gde.client.beans.NuovoEvento;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.gde.mapper.EventoIbanMapper;
+import it.govpay.pagopa.backoffice.client.model.BrokerInstitutionsResponse;
 import it.govpay.pagopa.backoffice.client.model.CIIbansResponse;
 import lombok.extern.slf4j.Slf4j;
 
@@ -141,6 +142,48 @@ public class GdeService extends AbstractGdeService {
                 Costanti.OPERATION_GET_ALL_IBANS, transactionId, dataStart, dataEnd);
 
         nuovoEvento.setDettaglioEsito(String.format("Retrieved %d ibans", ibansCount));
+
+        eventoIbanMapper.setParametriRichiesta(nuovoEvento, url, "GET", GdeUtils.getCapturedRequestHeadersAsGdeHeaders());
+        eventoIbanMapper.setParametriRisposta(nuovoEvento, dataEnd, responseEntity, null);
+
+        setResponsePayload(nuovoEvento, responseEntity, null);
+        sendEventAsync(nuovoEvento);
+	}
+
+    /**
+     * Builds the URL for getBrokerInstitutions using GdeUtils.buildUrl().
+     */
+    private String buildGetBrokerInstitutionsUrl(String pagoPABaseUrl, String codIntermediario) {
+        Map<String, String> pathParams = Map.of("{brokerCode}", codIntermediario);
+        return GdeUtils.buildUrl(pagoPABaseUrl, Costanti.PATH_GET_BROKER_INSTITUTIONS, pathParams, null);
+    }
+
+	public void saveGetBrokerInstitutionsKo(String codIntermediario, OffsetDateTime dataStart, OffsetDateTime dataEnd,
+			ResponseEntity<BrokerInstitutionsResponse> responseEntity, RestClientException exception, String pagoPABaseUrl) {
+        String transactionId = UUID.randomUUID().toString();
+        String url = buildGetBrokerInstitutionsUrl(pagoPABaseUrl, codIntermediario);
+
+        NuovoEvento nuovoEvento = eventoIbanMapper.createEventoKo(
+                Costanti.OPERATION_GET_BROKER_INSTITUTIONS, transactionId, dataStart, dataEnd,
+                null, exception);
+
+        eventoIbanMapper.setParametriRichiesta(nuovoEvento, url, "GET", GdeUtils.getCapturedRequestHeadersAsGdeHeaders());
+        eventoIbanMapper.setParametriRisposta(nuovoEvento, dataEnd, null, exception);
+
+        setResponsePayload(nuovoEvento, responseEntity, exception);
+
+        sendEventAsync(nuovoEvento);
+	}
+
+	public void saveGetBrokerInstitutionsOk(String codIntermediario, OffsetDateTime dataStart, OffsetDateTime dataEnd, int entiCount,
+			ResponseEntity<BrokerInstitutionsResponse> responseEntity, String pagoPABaseUrl) {
+        String transactionId = UUID.randomUUID().toString();
+        String url = buildGetBrokerInstitutionsUrl(pagoPABaseUrl, codIntermediario);
+
+        NuovoEvento nuovoEvento = eventoIbanMapper.createEventoOk(
+                Costanti.OPERATION_GET_BROKER_INSTITUTIONS, transactionId, dataStart, dataEnd);
+
+        nuovoEvento.setDettaglioEsito(String.format("Retrieved %d creditor institutions", entiCount));
 
         eventoIbanMapper.setParametriRichiesta(nuovoEvento, url, "GET", GdeUtils.getCapturedRequestHeadersAsGdeHeaders());
         eventoIbanMapper.setParametriRisposta(nuovoEvento, dataEnd, responseEntity, null);

@@ -42,7 +42,7 @@ import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.batch.service.JobConcurrencyService;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
-import it.govpay.iban.batch.service.IbanPagopaApiService;
+import it.govpay.iban.batch.config.PagoPaApiClientFactory;
 
 class BatchControllerTest {
 
@@ -65,7 +65,7 @@ class BatchControllerTest {
     private ConnettoreService connettoreService;
 
     @Mock
-    private IbanPagopaApiService ibanPagopaApiService;
+    private PagoPaApiClientFactory pagoPaApiClientFactory;
 
     private BatchController batchController;
 
@@ -78,8 +78,20 @@ class BatchControllerTest {
         MockitoAnnotations.openMocks(this);
         when(jobExecutionHelper.getJobConcurrencyService()).thenReturn(jobConcurrencyService);
         batchController = new BatchController(jobExecutionHelper, jobRepository, ibanCheckJob,
-                connettoreService, ibanPagopaApiService,
+                connettoreService, pagoPaApiClientFactory,
                 environment, ZONE_ID, SCHEDULER_INTERVAL_MILLIS);
+    }
+
+    // ============ Test endpoint clearCache ============
+
+    @Test
+    void whenClearCache_thenDelegatesToConnettoreServiceAndPagoPaApiClientFactory() {
+        ResponseEntity<String> response =
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(batchController, "clearCache");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(connettoreService).clearCache();
+        verify(pagoPaApiClientFactory).clearApiCache();
     }
 
     private JobExecution createJobExecution(String clusterId, BatchStatus status) {
