@@ -17,10 +17,15 @@ public class BatchProperties {
      */
     private int threadPoolSize = 5;
 
-    /**     
+    /**
      * Chunk size for Step 2 - Check IBAN
-     */     
+     */
     private int checkIbanChunkSize = 1;
+
+    /**
+     * Chunk size for Step 3 - Ente Creditore sync (no per-item file I/O, can be larger)
+     */
+    private int ecSyncChunkSize = 50;
 
     /**
      * Enable/disable automatic scheduling

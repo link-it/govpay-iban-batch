@@ -160,7 +160,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
     }
 
     private void printCleanupStats(StepExecution stepExecution) {
-        log.info("--- STEP 1: CLEANUP IBAN_PAGOPA_TEMP ---");
+        log.info("--- STEP 1: CLEANUP PAGOPA_IBAN_CHECK ---");
         log.info("Status: {}", stepExecution.getStatus());
         long durationMs = Duration.between(stepExecution.getStartTime(), stepExecution.getEndTime()).toMillis();
         log.info("Durata: {} ms", durationMs);

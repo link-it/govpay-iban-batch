@@ -4,6 +4,8 @@ import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,13 +23,16 @@ import org.springframework.transaction.annotation.Transactional;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.FileStorageConfig;
 import it.govpay.iban.batch.dto.IbanPagopa;
-import it.govpay.iban.batch.entity.IbanPagopaTempEntity;
-import it.govpay.iban.batch.repository.IbanPagopaTempRepository;
+import it.govpay.iban.batch.entity.IbanCacheEntity;
+import it.govpay.iban.batch.entity.PagopaIbanCheckEntity;
+import it.govpay.iban.batch.repository.IbanCacheRepository;
+import it.govpay.iban.batch.repository.PagopaIbanCheckRepository;
 import it.govpay.iban.batch.utils.CsvRowGenerator;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Writer to save IBAN pagoPA to IBAN_PAGOPA_TEMP table and generete report file
+ * Writer to save IBAN pagoPA to PAGOPA_IBAN_CHECK table, upsert pagopa_iban_cache
+ * (censimento assistito, issue #34) and generate the report file.
  */
 @Component
 @StepScope
@@ -38,8 +43,10 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     public static final String STATS_SAVED_COUNT = "ibansSavedCount";
     public static final String STATS_NO_CHANGE_COUNT = "ibansNoChangeCount";
 
-    private final IbanPagopaTempRepository ibanTempRepository;
+    private final PagopaIbanCheckRepository pagopaIbanCheckRepository;
+    private final IbanCacheRepository ibanCacheRepository;
     private final FileStorageConfig fileStorageConfig;
+    private final ZoneId applicationZoneId;
     private final CsvRowGenerator csvRowGenerator = new CsvRowGenerator();
     private StepExecution stepExecution;
     private BufferedOutputStream reportOS;
@@ -47,9 +54,14 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     @Value("#{stepExecutionContext['codIntermediario']}")
     private String codIntermediario;
 
-    public IbanCheckWriter(IbanPagopaTempRepository ibanTempRepository, FileStorageConfig fileStorageConfig) {
-        this.ibanTempRepository = ibanTempRepository;
+    public IbanCheckWriter(PagopaIbanCheckRepository pagopaIbanCheckRepository,
+                           IbanCacheRepository ibanCacheRepository,
+                           FileStorageConfig fileStorageConfig,
+                           ZoneId applicationZoneId) {
+        this.pagopaIbanCheckRepository = pagopaIbanCheckRepository;
+        this.ibanCacheRepository = ibanCacheRepository;
         this.fileStorageConfig = fileStorageConfig;
+        this.applicationZoneId = applicationZoneId;
     }
 
     @BeforeStep
@@ -117,8 +129,8 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
      * @param stats statistics object to update
      */
     private void processIban(IbanPagopa ibanPagopa, IbanProcessingStats stats) {
-        // IBAN: inserire in IBAN_PAGOPA_TEMP 
-        IbanPagopaTempEntity ibanTemp = IbanPagopaTempEntity.builder()
+        // IBAN: inserire in PAGOPA_IBAN_CHECK
+        PagopaIbanCheckEntity ibanCheck = PagopaIbanCheckEntity.builder()
             .brokerCode(ibanPagopa.getCodIntermediario())
             .ciFiscalCode(ibanPagopa.getFiscalCode())
             .ciName(ibanPagopa.getName())
@@ -131,10 +143,12 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
             .checkMotivo(ibanPagopa.getCheckMotivo())
             .build();
 
-        ibanTempRepository.save(ibanTemp);
+        pagopaIbanCheckRepository.save(ibanCheck);
         stats.savedCount++;
         if (ibanPagopa.getCheckStato().equals(Costanti.CHECK_OK))
         	stats.alreadyNoChangeCount++;
+
+        upsertIbanCache(ibanPagopa);
 
         try {
             Map<String, String> outputData = new HashMap<>();
@@ -156,6 +170,24 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
             log.error("Error producing CSV row from json", e);
         }
 
+    }
+
+    /**
+     * Upserts pagopa_iban_cache keyed by (codDominio, iban), for the assisted
+     * enrollment lookup (issue #34). "attivo" reflects only pagoPA's status
+     * (ENABLED), deliberately ignoring validityDate: its real semantics
+     * ("Activation Date" per spec vs. a possible expiration reading) are
+     * unconfirmed, so it is not used for any derived state here.
+     */
+    private void upsertIbanCache(IbanPagopa ibanPagopa) {
+        IbanCacheEntity cacheEntity = ibanCacheRepository
+                .findByCodDominioAndIban(ibanPagopa.getFiscalCode(), ibanPagopa.getIban())
+                .orElseGet(IbanCacheEntity::new);
+        cacheEntity.setCodDominio(ibanPagopa.getFiscalCode());
+        cacheEntity.setIban(ibanPagopa.getIban());
+        cacheEntity.setAttivo("ENABLED".equalsIgnoreCase(ibanPagopa.getStatus()));
+        cacheEntity.setDataUltimaVerifica(OffsetDateTime.now(applicationZoneId));
+        ibanCacheRepository.save(cacheEntity);
     }
 
     /**

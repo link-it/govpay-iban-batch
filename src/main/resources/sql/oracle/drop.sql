@@ -1,10 +1,16 @@
--- Oracle - Drop IBAN_PAGOPA_TEMP table and related objects
+-- Oracle - Drop PAGOPA_IBAN_CHECK table and related objects
 
 -- Drop trigger first
-DROP TRIGGER IBAN_PAGOPA_TEMP_TRG;
+DROP TRIGGER PAGOPA_IBAN_CHECK_TRG;
 
 -- Drop table (cascade constraints to handle any foreign keys)
-DROP TABLE IBAN_PAGOPA_TEMP CASCADE CONSTRAINTS;
+DROP TABLE PAGOPA_IBAN_CHECK CASCADE CONSTRAINTS;
 
 -- Drop sequence
-DROP SEQUENCE seq_iban_pagopa_temp;
+DROP SEQUENCE seq_pagopa_iban_check;
+
+-- Oracle - Drop PAGOPA_EC_CHECK table and related objects
+
+DROP TRIGGER PAGOPA_EC_CHECK_TRG;
+DROP TABLE PAGOPA_EC_CHECK CASCADE CONSTRAINTS;
+DROP SEQUENCE seq_pagopa_ec_check;
