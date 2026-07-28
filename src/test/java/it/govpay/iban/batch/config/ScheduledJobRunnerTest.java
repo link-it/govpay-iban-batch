@@ -20,6 +20,7 @@ import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.JobInstance;
 import org.springframework.batch.core.job.parameters.JobParameters;
 
+import it.govpay.common.batch.TriggerType;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.batch.runner.JobExecutionHelper.PreExecutionCheckResult;
 import it.govpay.common.batch.runner.JobExecutionHelper.PreExecutionResult;
@@ -76,14 +77,14 @@ class ScheduledJobRunnerTest {
                 .thenReturn(new PreExecutionResult(PreExecutionCheckResult.CAN_PROCEED, null, null));
 
         JobExecution mockExecution = createJobExecution(BatchStatus.COMPLETED);
-        when(jobExecutionHelper.runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME))
+        when(jobExecutionHelper.runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME, TriggerType.SCHEDULED))
                 .thenReturn(mockExecution);
 
         JobExecution result = runner.runBatchIbanCheckJob();
 
         assertNotNull(result);
         assertEquals(BatchStatus.COMPLETED, result.getStatus());
-        verify(jobExecutionHelper).runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME);
+        verify(jobExecutionHelper).runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME, TriggerType.SCHEDULED);
     }
 
     @Test
@@ -92,13 +93,13 @@ class ScheduledJobRunnerTest {
                 .thenReturn(new PreExecutionResult(PreExecutionCheckResult.STALE_ABANDONED_CAN_PROCEED, null, null));
 
         JobExecution mockExecution = createJobExecution(BatchStatus.COMPLETED);
-        when(jobExecutionHelper.runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME))
+        when(jobExecutionHelper.runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME, TriggerType.SCHEDULED))
                 .thenReturn(mockExecution);
 
         JobExecution result = runner.runBatchIbanCheckJob();
 
         assertNotNull(result);
-        verify(jobExecutionHelper).runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME);
+        verify(jobExecutionHelper).runJob(ibanCheckJob, Costanti.IBAN_CHECK_JOB_NAME, TriggerType.SCHEDULED);
     }
 
     @Test

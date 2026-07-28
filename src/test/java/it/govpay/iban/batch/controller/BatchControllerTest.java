@@ -34,6 +34,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import it.govpay.common.batch.TriggerType;
+import it.govpay.common.batch.dto.BatchInfo;
 import it.govpay.common.batch.dto.BatchStatusInfo;
 import it.govpay.common.batch.dto.LastExecutionInfo;
 import it.govpay.common.batch.dto.NextExecutionInfo;
@@ -43,6 +45,7 @@ import it.govpay.common.batch.service.JobConcurrencyService;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.PagoPaApiClientFactory;
+import jakarta.persistence.EntityManager;
 
 class BatchControllerTest {
 
@@ -67,6 +70,9 @@ class BatchControllerTest {
     @Mock
     private PagoPaApiClientFactory pagoPaApiClientFactory;
 
+    @Mock
+    private EntityManager entityManager;
+
     private BatchController batchController;
 
     private static final String CLUSTER_ID = "TestCluster";
@@ -79,7 +85,7 @@ class BatchControllerTest {
         when(jobExecutionHelper.getJobConcurrencyService()).thenReturn(jobConcurrencyService);
         batchController = new BatchController(jobExecutionHelper, jobRepository, ibanCheckJob,
                 connettoreService, pagoPaApiClientFactory,
-                environment, ZONE_ID, SCHEDULER_INTERVAL_MILLIS);
+                environment, ZONE_ID, SCHEDULER_INTERVAL_MILLIS, entityManager);
     }
 
     // ============ Test endpoint clearCache ============
@@ -114,7 +120,7 @@ class BatchControllerTest {
                 .thenReturn(null);
 
         JobExecution mockExecution = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
-        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)))
+        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME), eq(TriggerType.MANUAL)))
                 .thenReturn(mockExecution);
 
         ResponseEntity<Object> response = batchController.eseguiJobEndpoint(false);
@@ -124,7 +130,7 @@ class BatchControllerTest {
 
         Awaitility.await()
                 .atMost(2, TimeUnit.SECONDS)
-                .untilAsserted(() -> verify(jobExecutionHelper).runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)));
+                .untilAsserted(() -> verify(jobExecutionHelper).runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME), eq(TriggerType.MANUAL)));
     }
 
     @Test
@@ -133,7 +139,7 @@ class BatchControllerTest {
                 .thenReturn(null);
 
         JobExecution mockExecution = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
-        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)))
+        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME), eq(TriggerType.MANUAL)))
                 .thenReturn(mockExecution);
 
         ResponseEntity<Object> response = batchController.eseguiJobEndpoint(true);
@@ -175,7 +181,7 @@ class BatchControllerTest {
                 .thenReturn(true);
 
         JobExecution mockExecution = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
-        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)))
+        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME), eq(TriggerType.MANUAL)))
                 .thenReturn(mockExecution);
 
         ResponseEntity<Object> response = batchController.eseguiJobEndpoint(false);
@@ -213,7 +219,7 @@ class BatchControllerTest {
                 .thenReturn(true);
 
         JobExecution mockExecution = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
-        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)))
+        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME), eq(TriggerType.MANUAL)))
                 .thenReturn(mockExecution);
 
         ResponseEntity<Object> response = batchController.eseguiJobEndpoint(true);
@@ -252,6 +258,35 @@ class BatchControllerTest {
         assertNotNull(response.getBody());
         Problem problem = (Problem) response.getBody();
         assertEquals(500, problem.getStatus());
+    }
+
+    // ============ Test getDisplayName/getDescription/info (ereditato) ============
+
+    @Test
+    void getDisplayNameAndDescriptionReturnNonBlankStrings() {
+        String displayName = org.springframework.test.util.ReflectionTestUtils.invokeMethod(batchController, "getDisplayName");
+        String description = org.springframework.test.util.ReflectionTestUtils.invokeMethod(batchController, "getDescription");
+
+        assertNotNull(displayName);
+        assertNotNull(description);
+        assertFalse(displayName.isBlank());
+        assertFalse(description.isBlank());
+    }
+
+    @Test
+    void infoEndpointReturnsBatchInfo() {
+        ResponseEntity<BatchInfo> response = batchController.info();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        BatchInfo info = response.getBody();
+        assertNotNull(info);
+        assertEquals(Costanti.IBAN_CHECK_JOB_NAME, info.getJobName());
+        assertEquals(
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(batchController, "getDisplayName"),
+                info.getDisplayName());
+        assertEquals(
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(batchController, "getDescription"),
+                info.getDescription());
     }
 
     // ============ Test endpoint /status ============
@@ -358,7 +393,7 @@ class BatchControllerTest {
     void whenJobLauncherThrowsExceptionAsync_thenReturns202ButLogsError() throws Exception {
         when(jobConcurrencyService.getCurrentRunningJobExecution(Costanti.IBAN_CHECK_JOB_NAME))
                 .thenReturn(null);
-        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME)))
+        when(jobExecutionHelper.runJob(eq(ibanCheckJob), eq(Costanti.IBAN_CHECK_JOB_NAME), eq(TriggerType.MANUAL)))
                 .thenThrow(new RuntimeException("Launcher failure"));
 
         ResponseEntity<Object> response = batchController.eseguiJobEndpoint(false);
