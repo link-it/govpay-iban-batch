@@ -21,6 +21,7 @@ import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.PagoPaApiClientFactory;
+import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -43,8 +44,9 @@ public class BatchController extends AbstractBatchController {
             PagoPaApiClientFactory pagoPaApiClientFactory,
             Environment environment,
             ZoneId applicationZoneId,
-            @Value("${scheduler.ibanCheckJob.fixedDelayString:7200000}") long schedulerIntervalMillis) {
-        super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis);
+            @Value("${scheduler.ibanCheckJob.fixedDelayString:7200000}") long schedulerIntervalMillis,
+            EntityManager entityManager) {
+        super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis, entityManager);
         this.ibanCheckJob = ibanCheckJob;
         this.connettoreService = connettoreService;
         this.pagoPaApiClientFactory = pagoPaApiClientFactory;
@@ -58,6 +60,18 @@ public class BatchController extends AbstractBatchController {
     @Override
     protected String getJobName() {
         return Costanti.IBAN_CHECK_JOB_NAME;
+    }
+
+    @Override
+    protected String getDisplayName() {
+        return "GovPay IBAN Batch";
+    }
+
+    @Override
+    protected String getDescription() {
+        return "Verifica automatica dell'attivazione degli IBAN su pagoPA: il sistema verifica lo stato di "
+                + "attivazione degli IBAN configurati interrogando le API pagoPA e aggiorna le informazioni nel "
+                + "database GovPay.";
     }
 
     @Override
