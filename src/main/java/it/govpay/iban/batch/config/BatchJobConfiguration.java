@@ -119,7 +119,8 @@ public class BatchJobConfiguration {
         IbanCheckWriter ibanCheckWriter
     ) {
         return new StepBuilder("ibanCheckWorkerStep", jobRepository)
-            .<IbanPagopa, IbanPagopa>chunk(batchProperties.getCheckIbanChunkSize(), transactionManager)
+            .<IbanPagopa, IbanPagopa>chunk(batchProperties.getCheckIbanChunkSize())
+            .transactionManager(transactionManager)
             .reader(ibanCheckReader)
             .processor(ibanCheckProcessor)
             .writer(ibanCheckWriter)
@@ -164,7 +165,8 @@ public class BatchJobConfiguration {
         EcSyncWriter ecSyncWriter
     ) {
         return new StepBuilder("ecSyncWorkerStep", jobRepository)
-            .<EnteCreditorePagopa, EnteCreditorePagopa>chunk(batchProperties.getEcSyncChunkSize(), transactionManager)
+            .<EnteCreditorePagopa, EnteCreditorePagopa>chunk(batchProperties.getEcSyncChunkSize())
+            .transactionManager(transactionManager)
             .reader(ecSyncReader)
             .processor(ecCheckProcessor)
             .writer(ecSyncWriter)

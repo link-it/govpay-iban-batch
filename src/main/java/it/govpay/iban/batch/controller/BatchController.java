@@ -1,12 +1,7 @@
 package it.govpay.iban.batch.controller;
 
-import java.time.ZoneId;
-
 import org.springframework.batch.core.job.Job;
-import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,11 +12,10 @@ import it.govpay.common.batch.controller.AbstractBatchController;
 import it.govpay.common.batch.dto.BatchStatusInfo;
 import it.govpay.common.batch.dto.LastExecutionInfo;
 import it.govpay.common.batch.dto.NextExecutionInfo;
-import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
+import it.govpay.iban.batch.config.BatchControllerSupport;
 import it.govpay.iban.batch.config.PagoPaApiClientFactory;
-import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -37,16 +31,12 @@ public class BatchController extends AbstractBatchController {
     private final PagoPaApiClientFactory pagoPaApiClientFactory;
 
     public BatchController(
-            JobExecutionHelper jobExecutionHelper,
-            JobRepository jobRepository,
+            BatchControllerSupport support,
             @Qualifier("ibanCheckJob") Job ibanCheckJob,
             ConnettoreService connettoreService,
-            PagoPaApiClientFactory pagoPaApiClientFactory,
-            Environment environment,
-            ZoneId applicationZoneId,
-            @Value("${scheduler.ibanCheckJob.fixedDelayString:7200000}") long schedulerIntervalMillis,
-            EntityManager entityManager) {
-        super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis, entityManager);
+            PagoPaApiClientFactory pagoPaApiClientFactory) {
+        super(support.jobExecutionHelper(), support.jobRepository(), support.environment(),
+                support.applicationZoneId(), support.schedulerIntervalMillis(), support.entityManager());
         this.ibanCheckJob = ibanCheckJob;
         this.connettoreService = connettoreService;
         this.pagoPaApiClientFactory = pagoPaApiClientFactory;

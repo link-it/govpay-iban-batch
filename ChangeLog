@@ -1,3 +1,27 @@
+2026-08-27  Giuliano Pintori <pintori@link.it>
+
+	* [Qualita']
+	Risolte le 13 segnalazioni SonarCloud aperte sul progetto.
+	- BatchExecutionRecapListener: iniettato applicationZoneId; le LocalDateTime.now()
+	  senza fuso sono state sostituite con now(applicationZoneId) e i calcoli di durata
+	  passano ora dai LocalDateTime di Spring Batch a Instant ancorati al timezone
+	  applicativo (metodi durata()/toInstant()), cosi' l'intervallo resta corretto anche
+	  a cavallo del cambio ora legale/solare. Estratto il try annidato della raccolta
+	  allegati nel metodo leggiReport().
+	- IbanCheckProcessor: iniettato applicationZoneId, OffsetDateTime.now() esplicita
+	  sul fuso applicativo.
+	- IbanCheckWriter: LocalDateTime.now(applicationZoneId) per il timestamp del file di
+	  report; estratto il DateTimeFormatter in costante.
+	- BatchJobConfiguration: rimosse le chiamate a StepBuilder.chunk(int,
+	  PlatformTransactionManager), deprecata e marcata for removal in Spring Batch 6,
+	  in favore di chunk(int).transactionManager(...) sul nuovo
+	  ChunkOrientedStepBuilder.
+	- BatchController: costruttore ridotto da 9 a 4 parametri raggruppando i
+	  collaboratori infrastrutturali di AbstractBatchController nel nuovo record
+	  BatchControllerSupport (stesso pattern gia' adottato in govpay-notify-batch).
+	- EntiCreditoriApiServiceTest / IbanPagopaApiServiceTest: riformulati i commenti
+	  che Sonar interpretava come blocchi di codice commentato.
+
 2026-07-25  Giuliano Pintori <pintori@link.it>
 
 	* [Build]

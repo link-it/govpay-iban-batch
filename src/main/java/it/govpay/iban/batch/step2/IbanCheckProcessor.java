@@ -6,6 +6,8 @@ import it.govpay.iban.batch.entity.IbanAccreditoEntity;
 import it.govpay.iban.batch.repository.IbanAccreditoRepository;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.StringJoiner;
 
@@ -20,16 +22,18 @@ import org.springframework.stereotype.Component;
 public class IbanCheckProcessor implements ItemProcessor<IbanPagopa, IbanPagopa> {
 
 	private final IbanAccreditoRepository ibanAccreditoRepository;
+	private final ZoneId applicationZoneId;
 
-	public IbanCheckProcessor(IbanAccreditoRepository ibanAccreditoRepository) {
+	public IbanCheckProcessor(IbanAccreditoRepository ibanAccreditoRepository, ZoneId applicationZoneId) {
 		this.ibanAccreditoRepository = ibanAccreditoRepository;
+		this.applicationZoneId = applicationZoneId;
     }
 
 	private void checkUpdated(IbanAccreditoEntity storedIban, IbanPagopa iban) {
 		StringJoiner stringJoiner = new StringJoiner(",");
 		boolean storedEnable = storedIban.getAbilitato() != null && storedIban.getAbilitato().booleanValue();
 		boolean ibanEnable   = iban.getStatus().equalsIgnoreCase("ENABLED") &&
-							   (iban.getValidityDate() == null || !iban.getValidityDate().isAfter(java.time.OffsetDateTime.now()));
+							   (iban.getValidityDate() == null || !iban.getValidityDate().isAfter(OffsetDateTime.now(applicationZoneId)));
 		String checkStato = Costanti.CHECK_OK;
 		if (storedEnable != ibanEnable) {
 			checkStato = Costanti.CHECK_INFO_DIVERSE;
