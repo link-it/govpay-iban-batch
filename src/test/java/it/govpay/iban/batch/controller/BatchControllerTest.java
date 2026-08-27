@@ -44,6 +44,7 @@ import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.batch.service.JobConcurrencyService;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
+import it.govpay.iban.batch.config.BatchControllerSupport;
 import it.govpay.iban.batch.config.PagoPaApiClientFactory;
 import jakarta.persistence.EntityManager;
 
@@ -83,9 +84,9 @@ class BatchControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(jobExecutionHelper.getJobConcurrencyService()).thenReturn(jobConcurrencyService);
-        batchController = new BatchController(jobExecutionHelper, jobRepository, ibanCheckJob,
-                connettoreService, pagoPaApiClientFactory,
-                environment, ZONE_ID, SCHEDULER_INTERVAL_MILLIS, entityManager);
+        BatchControllerSupport support = new BatchControllerSupport(
+                jobExecutionHelper, jobRepository, environment, ZONE_ID, SCHEDULER_INTERVAL_MILLIS, entityManager);
+        batchController = new BatchController(support, ibanCheckJob, connettoreService, pagoPaApiClientFactory);
     }
 
     // ============ Test endpoint clearCache ============

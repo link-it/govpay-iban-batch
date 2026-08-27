@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
@@ -31,10 +32,11 @@ class IbanCheckProcessorTest {
     private static final String IBAN = "IT60X0542811101000000123456";
     private static final String FISCAL_CODE = "01234567890";
     private static final String INTERMEDIARIO = "12345678901";
+    private static final ZoneId ZONE_ID = ZoneId.of("Europe/Rome");
 
     @BeforeEach
     void setUp() {
-        processor = new IbanCheckProcessor(ibanAccreditoRepository);
+        processor = new IbanCheckProcessor(ibanAccreditoRepository, ZONE_ID);
     }
 
     private IbanPagopa createIbanPagopa(String status, OffsetDateTime validityDate, String description, String name) {

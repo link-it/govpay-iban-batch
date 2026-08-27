@@ -88,8 +88,9 @@ class EntiCreditoriApiServiceTest {
         when(pagoPaApiClientFactory.getOrCreateApi(COD_INTERMEDIARIO))
                 .thenThrow(new IllegalStateException("Nessun intermediario trovato: " + COD_INTERMEDIARIO));
 
-        // fetchEntiPage's generic catch(Exception) wraps any failure (including
-        // connector-resolution errors from the factory) into a RestClientException.
+        // Il catch generico di fetchEntiPage intercetta qualunque errore, compresi
+        // quelli di risoluzione del connettore sollevati dalla factory, e lo
+        // incapsula in una RestClientException.
         RestClientException thrown = assertThrows(RestClientException.class,
                 () -> service.getAllEntiCreditori(COD_INTERMEDIARIO));
         assertTrue(thrown.getCause() instanceof IllegalStateException);

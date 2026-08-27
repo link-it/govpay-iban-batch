@@ -5,11 +5,14 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.listener.JobExecutionListener;
@@ -33,21 +36,24 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
 
     private final FileStorageConfig fileStorageConfig;
     private final MailService mailService;
+    private final ZoneId applicationZoneId;
 
     private String jobStartTimestamp;
 
-    public BatchExecutionRecapListener(FileStorageConfig fileStorageConfig, MailService mailService) {
+    public BatchExecutionRecapListener(FileStorageConfig fileStorageConfig, MailService mailService,
+                                       ZoneId applicationZoneId) {
         this.fileStorageConfig = fileStorageConfig;
         this.mailService = mailService;
+        this.applicationZoneId = applicationZoneId;
     }
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
-        jobStartTimestamp = LocalDateTime.now().format(FILE_TIMESTAMP_FORMATTER);
+        jobStartTimestamp = LocalDateTime.now(applicationZoneId).format(FILE_TIMESTAMP_FORMATTER);
         log.info("=".repeat(80));
         log.info("INIZIO BATCH CONTROLLO IBAN");
         log.info("Job ID: {}", jobExecution.getJobInstanceId());
-        log.info("Avvio: {}", LocalDateTime.now().format(TIME_FORMATTER));
+        log.info("Avvio: {}", LocalDateTime.now(applicationZoneId).format(TIME_FORMATTER));
         log.info("=".repeat(80));
     }
 
@@ -58,10 +64,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
         log.info("=".repeat(80));
 
         // Statistiche generali
-        Duration duration = Duration.between(
-            jobExecution.getStartTime(),
-            jobExecution.getEndTime()
-        );
+        Duration duration = durata(jobExecution.getStartTime(), jobExecution.getEndTime());
 
         log.info("Status finale: {}", jobExecution.getStatus());
         log.info("Durata totale: {} secondi", duration.getSeconds());
@@ -129,18 +132,29 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(reportDir, "reportCheckIban-*-" + jobStartTimestamp + "*.csv")) {
             for (Path file : stream) {
-                try {
-                    allegati.put(file.getFileName().toString(), Files.readAllBytes(file));
-                    log.debug("Allegato file report: {}", file.getFileName());
-                } catch (IOException e) {
-                    log.error("Errore lettura file report {}: {}", file, e.getMessage());
-                }
+                leggiReport(file).ifPresent(contenuto -> allegati.put(file.getFileName().toString(), contenuto));
             }
         } catch (IOException e) {
             log.error("Errore durante la scansione della directory report: {}", e.getMessage());
         }
 
         return allegati;
+    }
+
+    /**
+     * Legge il contenuto di un singolo file di report. Un errore di lettura non
+     * interrompe la raccolta degli altri allegati: viene loggato e il file viene
+     * semplicemente escluso dalla mail.
+     */
+    private Optional<byte[]> leggiReport(Path file) {
+        try {
+            byte[] contenuto = Files.readAllBytes(file);
+            log.debug("Allegato file report: {}", file.getFileName());
+            return Optional.of(contenuto);
+        } catch (IOException e) {
+            log.error("Errore lettura file report {}: {}", file, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private void printStepStatistics(JobExecution jobExecution) {
@@ -162,7 +176,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
     private void printCleanupStats(StepExecution stepExecution) {
         log.info("--- STEP 1: CLEANUP PAGOPA_IBAN_CHECK ---");
         log.info("Status: {}", stepExecution.getStatus());
-        long durationMs = Duration.between(stepExecution.getStartTime(), stepExecution.getEndTime()).toMillis();
+        long durationMs = durata(stepExecution.getStartTime(), stepExecution.getEndTime()).toMillis();
         log.info("Durata: {} ms", durationMs);
         log.info("");
     }
@@ -193,7 +207,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
             totalWritten += partitionExec.getWriteCount();
             totalErrors += (int) (partitionExec.getReadSkipCount() + partitionExec.getProcessSkipCount());
 
-            long partDuration = Duration.between(partitionExec.getStartTime(), partitionExec.getEndTime()).toMillis();
+            long partDuration = durata(partitionExec.getStartTime(), partitionExec.getEndTime()).toMillis();
             totalDuration += partDuration;
 
             // Estrai codIntermediario dal nome della partizione o dal context
@@ -253,6 +267,26 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
         }
 
         return "unknown";
+    }
+
+    /**
+     * Calcola la durata fra due istanti espressi da Spring Batch come
+     * {@link LocalDateTime}, tipo che non porta con se' il fuso orario: prima del
+     * calcolo i timestamp vengono ancorati al timezone applicativo e convertiti in
+     * {@link Instant}, cosi' l'intervallo resta corretto anche a cavallo del cambio
+     * fra ora legale e ora solare.
+     *
+     * @return la durata fra i due istanti, {@link Duration#ZERO} se uno dei due manca
+     */
+    private Duration durata(LocalDateTime inizio, LocalDateTime fine) {
+        if (inizio == null || fine == null) {
+            return Duration.ZERO;
+        }
+        return Duration.between(toInstant(inizio), toInstant(fine));
+    }
+
+    private Instant toInstant(LocalDateTime dateTime) {
+        return dateTime.atZone(applicationZoneId).toInstant();
     }
 
     private static class PartitionStats {

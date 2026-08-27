@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 
@@ -23,6 +24,8 @@ import it.govpay.iban.batch.mail.MailService;
 
 class BatchExecutionRecapListenerTest {
 
+    private static final ZoneId ZONE_ID = ZoneId.of("Europe/Rome");
+
     private BatchExecutionRecapListener listener;
 
     @BeforeEach
@@ -32,7 +35,7 @@ class BatchExecutionRecapListenerTest {
         when(fileStorageConfig.getReportDirectory()).thenReturn(Path.of("/tmp"));
         when(fileStorageConfig.getDestinatario()).thenReturn(Collections.emptyList());
         MailService mailService = mock(MailService.class);
-        listener = new BatchExecutionRecapListener(fileStorageConfig, mailService);
+        listener = new BatchExecutionRecapListener(fileStorageConfig, mailService, ZONE_ID);
     }
 
     private JobExecution createJobExecution() {

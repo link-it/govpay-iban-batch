@@ -4,8 +4,10 @@ import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,8 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     public static final String STATS_SAVED_COUNT = "ibansSavedCount";
     public static final String STATS_NO_CHANGE_COUNT = "ibansNoChangeCount";
 
+    private static final DateTimeFormatter FILE_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+
     private final PagopaIbanCheckRepository pagopaIbanCheckRepository;
     private final IbanCacheRepository ibanCacheRepository;
     private final FileStorageConfig fileStorageConfig;
@@ -71,7 +75,7 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
         stepExecution.getExecutionContext().putInt(STATS_SAVED_COUNT, 0);
         stepExecution.getExecutionContext().putInt(STATS_NO_CHANGE_COUNT, 0);
         
-        String timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String timestamp = LocalDateTime.now(applicationZoneId).format(FILE_TIMESTAMP_FORMATTER);
         String fileName = "reportCheckIban-" + codIntermediario + "-" + timestamp + ".csv";
         Path reportDir = fileStorageConfig.getReportDirectory();
         // Costruisce il percorso completo del file

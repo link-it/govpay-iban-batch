@@ -7,10 +7,12 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.common.batch.service.JobConcurrencyService;
+import jakarta.persistence.EntityManager;
 
 /**
  * Configurazione dei bean infrastrutturali per la gestione batch multi-nodo.
@@ -53,5 +55,22 @@ public class BatchInfraConfig {
         SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("iban-batch-");
         executor.setConcurrencyLimit(batchProperties.getThreadPoolSize());
         return executor;
+    }
+
+    /**
+     * Raggruppa i collaboratori infrastrutturali richiesti da
+     * {@code AbstractBatchController}, cosi' il costruttore del controller espone
+     * solo le dipendenze specifiche del batch (vedi {@link BatchControllerSupport}).
+     */
+    @Bean
+    public BatchControllerSupport batchControllerSupport(
+            JobExecutionHelper jobExecutionHelper,
+            JobRepository jobRepository,
+            Environment environment,
+            ZoneId applicationZoneId,
+            @Value("${scheduler.ibanCheckJob.fixedDelayString:7200000}") long schedulerIntervalMillis,
+            EntityManager entityManager) {
+        return new BatchControllerSupport(jobExecutionHelper, jobRepository, environment,
+                applicationZoneId, schedulerIntervalMillis, entityManager);
     }
 }
