@@ -9,8 +9,6 @@ import it.govpay.iban.batch.step2.IbanCheckWriter;
 import it.govpay.iban.batch.step3.EcCheckProcessor;
 import it.govpay.iban.batch.step3.EcSyncReader;
 import it.govpay.iban.batch.step3.EcSyncWriter;
-import it.govpay.iban.batch.tasklet.CleanupEcCheckTasklet;
-import it.govpay.iban.batch.tasklet.CleanupPagopaIbanCheckTasklet;
 import it.govpay.iban.batch.tasklet.CleanupStaleEntiCreditoriTasklet;
 import it.govpay.iban.batch.tasklet.CleanupStaleIbanCacheTasklet;
 import lombok.extern.slf4j.Slf4j;
@@ -48,12 +46,10 @@ public class BatchJobConfiguration {
     }
 
     /**
-     * Main Check IBAN Job: cleanup -> check IBAN -> sync anagrafica Enti Creditori -> cleanup stale EC cache
+     * Main Check IBAN Job: check IBAN -> cleanup stale IBAN cache -> sync anagrafica Enti Creditori -> cleanup stale EC cache
      */
     @Bean
     public Job ibanCheckJob(
-        Step cleanupStep,
-        Step cleanupEcCheckStep,
         Step ibanCheckAcquisitionStep,
         Step cleanupStaleIbanCacheStep,
         Step ecSyncAcquisitionStep,
@@ -63,9 +59,7 @@ public class BatchJobConfiguration {
         return new JobBuilder(Costanti.IBAN_CHECK_JOB_NAME, jobRepository)
             .incrementer(new RunIdIncrementer())
             .listener(batchExecutionRecapListener)
-            .start(cleanupStep)
-            .next(cleanupEcCheckStep)
-            .next(ibanCheckAcquisitionStep)
+            .start(ibanCheckAcquisitionStep)
             .next(cleanupStaleIbanCacheStep)
             .next(ecSyncAcquisitionStep)
             .next(cleanupStaleEntiCreditoriStep)
@@ -73,27 +67,7 @@ public class BatchJobConfiguration {
     }
 
     /**
-     * Step 1: Cleanup PAGOPA_IBAN_CHECK table
-     */
-    @Bean
-    public Step cleanupStep(CleanupPagopaIbanCheckTasklet cleanupPagopaIbanCheckTasklet) {
-        return new StepBuilder("cleanupStep", jobRepository)
-            .tasklet(cleanupPagopaIbanCheckTasklet, transactionManager)
-            .build();
-    }
-
-    /**
-     * Step 1b: Cleanup PAGOPA_EC_CHECK table
-     */
-    @Bean
-    public Step cleanupEcCheckStep(CleanupEcCheckTasklet cleanupEcCheckTasklet) {
-        return new StepBuilder("cleanupEcCheckStep", jobRepository)
-            .tasklet(cleanupEcCheckTasklet, transactionManager)
-            .build();
-    }
-
-    /**
-     * Step 2: Check IBAN (PARTITIONED by intermediario)
+     * Step 1: Check IBAN (PARTITIONED by intermediario)
      */
     @Bean
     public Step ibanCheckAcquisitionStep(
@@ -129,7 +103,7 @@ public class BatchJobConfiguration {
     }
 
     /**
-     * Step 2b: Cleanup delle righe stale in pagopa_iban_cache (solo se lo Step 2 e' COMPLETED)
+     * Step 1b: Cleanup delle righe stale in pagopa_iban_cache (solo se lo Step 1 e' COMPLETED)
      */
     @Bean
     public Step cleanupStaleIbanCacheStep(CleanupStaleIbanCacheTasklet cleanupStaleIbanCacheTasklet) {
@@ -139,7 +113,7 @@ public class BatchJobConfiguration {
     }
 
     /**
-     * Step 3: Sync anagrafica Enti Creditori (PARTITIONED by intermediario, stesso partitioner dello Step 2)
+     * Step 2: Sync anagrafica Enti Creditori (PARTITIONED by intermediario, stesso partitioner dello Step 1)
      */
     @Bean
     public Step ecSyncAcquisitionStep(
@@ -175,7 +149,7 @@ public class BatchJobConfiguration {
     }
 
     /**
-     * Step 4: Cleanup delle righe stale in pagopa_ec_cache (solo se lo Step 3 e' COMPLETED)
+     * Step 3: Cleanup delle righe stale in pagopa_ec_cache (solo se lo Step 2 e' COMPLETED)
      */
     @Bean
     public Step cleanupStaleEntiCreditoriStep(CleanupStaleEntiCreditoriTasklet cleanupStaleEntiCreditoriTasklet) {

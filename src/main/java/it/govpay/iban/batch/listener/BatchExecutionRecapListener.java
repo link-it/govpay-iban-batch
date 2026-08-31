@@ -160,25 +160,11 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
     private void printStepStatistics(JobExecution jobExecution) {
         Collection<StepExecution> stepExecutions = jobExecution.getStepExecutions();
 
-        // Step 1: Cleanup
-        stepExecutions.stream()
-            .filter(se -> se.getStepName().equals("cleanupStep"))
-            .findFirst()
-            .ifPresent(this::printCleanupStats);
-
-        // Step 2: Check Iban from PagoPA
+        // Step 1: Check Iban from PagoPA
         stepExecutions.stream()
             .filter(se -> se.getStepName().equals("confrontoIbanStep"))
             .findFirst()
             .ifPresent(this::printCheckStepStats);
-    }
-
-    private void printCleanupStats(StepExecution stepExecution) {
-        log.info("--- STEP 1: CLEANUP PAGOPA_IBAN_CHECK ---");
-        log.info("Status: {}", stepExecution.getStatus());
-        long durationMs = durata(stepExecution.getStartTime(), stepExecution.getEndTime()).toMillis();
-        log.info("Durata: {} ms", durationMs);
-        log.info("");
     }
 
     private void printCheckStepStats(StepExecution masterStepExecution) {

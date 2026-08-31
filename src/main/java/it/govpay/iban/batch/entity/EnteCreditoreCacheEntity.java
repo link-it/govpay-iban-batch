@@ -52,4 +52,13 @@ public class EnteCreditoreCacheEntity {
 
 	@Column(name = "data_ultimo_aggiornamento", nullable = false)
 	private OffsetDateTime dataUltimoAggiornamento;
+
+	@Column(name = "cod_intermediario", length = 35)
+	private String codIntermediario;
+
+	@Column(name = "check_stato", length = 35)
+	private String checkStato;
+
+	@Column(name = "check_motivo", length = 1024)
+	private String checkMotivo;
 }

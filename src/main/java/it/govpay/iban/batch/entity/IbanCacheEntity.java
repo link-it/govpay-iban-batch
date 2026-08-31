@@ -44,4 +44,28 @@ public class IbanCacheEntity {
 
 	@Column(name = "data_ultima_verifica", nullable = false)
 	private OffsetDateTime dataUltimaVerifica;
+
+	@Column(name = "cod_intermediario", length = 35)
+	private String codIntermediario;
+
+	@Column(name = "ci_name", length = 255)
+	private String ciName;
+
+	@Column(name = "status", length = 255)
+	private String status;
+
+	@Column(name = "validity_date")
+	private OffsetDateTime validityDate;
+
+	@Column(name = "description", length = 512)
+	private String description;
+
+	@Column(name = "label", length = 1024)
+	private String label;
+
+	@Column(name = "check_stato", length = 35)
+	private String checkStato;
+
+	@Column(name = "check_motivo", length = 1024)
+	private String checkMotivo;
 }

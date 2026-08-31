@@ -26,15 +26,16 @@ import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.FileStorageConfig;
 import it.govpay.iban.batch.dto.IbanPagopa;
 import it.govpay.iban.batch.entity.IbanCacheEntity;
-import it.govpay.iban.batch.entity.PagopaIbanCheckEntity;
 import it.govpay.iban.batch.repository.IbanCacheRepository;
-import it.govpay.iban.batch.repository.PagopaIbanCheckRepository;
 import it.govpay.iban.batch.utils.CsvRowGenerator;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Writer to save IBAN pagoPA to PAGOPA_IBAN_CHECK table, upsert pagopa_iban_cache
- * (censimento assistito, issue #34) and generate the report file.
+ * Writer to upsert IBAN pagoPA into pagopa_iban_cache (censimento assistito,
+ * issue #34) and generate the report file. L'esito del confronto
+ * (checkStato/checkMotivo) e i dettagli pagoPA
+ * (ciName/status/validityDate/description/label) sono persistiti nella cache,
+ * oltre a restare nel report CSV.
  */
 @Component
 @StepScope
@@ -47,7 +48,6 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
 
     private static final DateTimeFormatter FILE_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
-    private final PagopaIbanCheckRepository pagopaIbanCheckRepository;
     private final IbanCacheRepository ibanCacheRepository;
     private final FileStorageConfig fileStorageConfig;
     private final ZoneId applicationZoneId;
@@ -58,11 +58,9 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     @Value("#{stepExecutionContext['codIntermediario']}")
     private String codIntermediario;
 
-    public IbanCheckWriter(PagopaIbanCheckRepository pagopaIbanCheckRepository,
-                           IbanCacheRepository ibanCacheRepository,
+    public IbanCheckWriter(IbanCacheRepository ibanCacheRepository,
                            FileStorageConfig fileStorageConfig,
                            ZoneId applicationZoneId) {
-        this.pagopaIbanCheckRepository = pagopaIbanCheckRepository;
         this.ibanCacheRepository = ibanCacheRepository;
         this.fileStorageConfig = fileStorageConfig;
         this.applicationZoneId = applicationZoneId;
@@ -133,21 +131,6 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
      * @param stats statistics object to update
      */
     private void processIban(IbanPagopa ibanPagopa, IbanProcessingStats stats) {
-        // IBAN: inserire in PAGOPA_IBAN_CHECK
-        PagopaIbanCheckEntity ibanCheck = PagopaIbanCheckEntity.builder()
-            .brokerCode(ibanPagopa.getCodIntermediario())
-            .ciFiscalCode(ibanPagopa.getFiscalCode())
-            .ciName(ibanPagopa.getName())
-            .iban(ibanPagopa.getIban())
-            .status(ibanPagopa.getStatus())
-            .validityDate(ibanPagopa.getValidityDate())
-            .description(ibanPagopa.getDescription())
-            .label(ibanPagopa.getLabel())
-            .checkStato(ibanPagopa.getCheckStato())
-            .checkMotivo(ibanPagopa.getCheckMotivo())
-            .build();
-
-        pagopaIbanCheckRepository.save(ibanCheck);
         stats.savedCount++;
         if (ibanPagopa.getCheckStato().equals(Costanti.CHECK_OK))
         	stats.alreadyNoChangeCount++;
@@ -191,6 +174,14 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
         cacheEntity.setIban(ibanPagopa.getIban());
         cacheEntity.setAttivo("ENABLED".equalsIgnoreCase(ibanPagopa.getStatus()));
         cacheEntity.setDataUltimaVerifica(OffsetDateTime.now(applicationZoneId));
+        cacheEntity.setCodIntermediario(ibanPagopa.getCodIntermediario());
+        cacheEntity.setCiName(ibanPagopa.getName());
+        cacheEntity.setStatus(ibanPagopa.getStatus());
+        cacheEntity.setValidityDate(ibanPagopa.getValidityDate());
+        cacheEntity.setDescription(ibanPagopa.getDescription());
+        cacheEntity.setLabel(ibanPagopa.getLabel());
+        cacheEntity.setCheckStato(ibanPagopa.getCheckStato());
+        cacheEntity.setCheckMotivo(ibanPagopa.getCheckMotivo());
         ibanCacheRepository.save(cacheEntity);
     }
 

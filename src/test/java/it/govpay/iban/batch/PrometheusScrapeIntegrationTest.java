@@ -26,7 +26,6 @@ import it.govpay.common.entity.IntermediarioEntity;
 import it.govpay.common.repository.IntermediarioRepository;
 import it.govpay.iban.batch.config.ScheduledJobRunner;
 import it.govpay.iban.batch.config.TestScheduledJobRunnerConfig;
-import it.govpay.iban.batch.repository.PagopaIbanCheckRepository;
 
 /**
  * Verifica end-to-end dell'esposizione delle metriche Prometheus:
@@ -64,8 +63,6 @@ class PrometheusScrapeIntegrationTest {
     private JobConcurrencyService jobConcurrencyService = mock(JobConcurrencyService.class);
     @MockitoBean
     private IntermediarioRepository intermediarioRepository = mock(IntermediarioRepository.class);
-    @MockitoBean
-    private PagopaIbanCheckRepository pagopaIbanCheckRepository = mock(PagopaIbanCheckRepository.class);
 
     private final HttpClient http = HttpClient.newHttpClient();
 

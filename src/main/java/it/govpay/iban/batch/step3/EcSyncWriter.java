@@ -9,33 +9,27 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.govpay.iban.batch.dto.EnteCreditorePagopa;
-import it.govpay.iban.batch.entity.EcCheckEntity;
 import it.govpay.iban.batch.entity.EnteCreditoreCacheEntity;
-import it.govpay.iban.batch.repository.EcCheckRepository;
 import it.govpay.iban.batch.repository.EnteCreditoreCacheRepository;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Writer that upserts Enti Creditori into pagopa_ec_cache, keyed by cod_fiscale,
- * and appends the check result (computed by {@link EcCheckProcessor}) into
- * pagopa_ec_check. Every pagopa_ec_cache write stamps
- * data_ultimo_aggiornamento = now(), which is what
+ * Writer that upserts Enti Creditori into pagopa_ec_cache, keyed by cod_fiscale.
+ * Every write stamps data_ultimo_aggiornamento = now(), which is what
  * CleanupStaleEntiCreditoriTasklet later uses to purge rows no longer returned
- * by pagoPA for their broker.
+ * by pagoPA for their broker. L'esito del confronto (computato da
+ * {@link EcCheckProcessor}) e' persistito insieme all'anagrafica.
  */
 @Component
 @Slf4j
 public class EcSyncWriter implements ItemWriter<EnteCreditorePagopa> {
 
     private final EnteCreditoreCacheRepository repository;
-    private final EcCheckRepository ecCheckRepository;
     private final ZoneId applicationZoneId;
 
     public EcSyncWriter(EnteCreditoreCacheRepository repository,
-                        EcCheckRepository ecCheckRepository,
                         ZoneId applicationZoneId) {
         this.repository = repository;
-        this.ecCheckRepository = ecCheckRepository;
         this.applicationZoneId = applicationZoneId;
     }
 
@@ -54,21 +48,11 @@ public class EcSyncWriter implements ItemWriter<EnteCreditorePagopa> {
             entity.setSegregationCode(ente.getSegregationCode());
             entity.setCbillCode(ente.getCbillCode());
             entity.setDataUltimoAggiornamento(OffsetDateTime.now(applicationZoneId));
+            entity.setCodIntermediario(ente.getCodIntermediario());
+            entity.setCheckStato(ente.getCheckStato());
+            entity.setCheckMotivo(ente.getCheckMotivo());
 
             repository.save(entity);
-
-            EcCheckEntity checkEntity = EcCheckEntity.builder()
-                    .codIntermediario(ente.getCodIntermediario())
-                    .taxCode(ente.getTaxCode())
-                    .companyName(ente.getCompanyName())
-                    .stationId(ente.getStationId())
-                    .auxDigit(ente.getAuxDigit())
-                    .segregationCode(ente.getSegregationCode())
-                    .cbillCode(ente.getCbillCode())
-                    .checkStato(ente.getCheckStato())
-                    .checkMotivo(ente.getCheckMotivo())
-                    .build();
-            ecCheckRepository.save(checkEntity);
         }
     }
 }

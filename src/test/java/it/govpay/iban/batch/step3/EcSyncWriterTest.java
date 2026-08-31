@@ -18,9 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.infrastructure.item.Chunk;
 
 import it.govpay.iban.batch.dto.EnteCreditorePagopa;
-import it.govpay.iban.batch.entity.EcCheckEntity;
 import it.govpay.iban.batch.entity.EnteCreditoreCacheEntity;
-import it.govpay.iban.batch.repository.EcCheckRepository;
 import it.govpay.iban.batch.repository.EnteCreditoreCacheRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,16 +27,13 @@ class EcSyncWriterTest {
     @Mock
     private EnteCreditoreCacheRepository repository;
 
-    @Mock
-    private EcCheckRepository ecCheckRepository;
-
     private static final ZoneId ZONE_ID = ZoneId.of("Europe/Rome");
 
     private EcSyncWriter writer;
 
     @BeforeEach
     void setUp() {
-        writer = new EcSyncWriter(repository, ecCheckRepository, ZONE_ID);
+        writer = new EcSyncWriter(repository, ZONE_ID);
     }
 
     private EnteCreditorePagopa createEnte(String checkStato, String checkMotivo) {
@@ -56,7 +51,7 @@ class EcSyncWriterTest {
     }
 
     @Test
-    void write_newEnte_shouldInsertCacheAndCheck() {
+    void write_newEnte_shouldInsertCache() {
         when(repository.findByCodFiscale("77777777777")).thenReturn(Optional.empty());
 
         writer.write(new Chunk<>(createEnte("OK", null)));
@@ -71,13 +66,8 @@ class EcSyncWriterTest {
         assertEquals("01", saved.getSegregationCode());
         assertEquals("AAAAAA", saved.getCbillCode());
         assertNotNull(saved.getDataUltimoAggiornamento());
-
-        ArgumentCaptor<EcCheckEntity> tempCaptor = ArgumentCaptor.forClass(EcCheckEntity.class);
-        verify(ecCheckRepository).save(tempCaptor.capture());
-        EcCheckEntity temp = tempCaptor.getValue();
-        assertEquals("12345678901", temp.getCodIntermediario());
-        assertEquals("77777777777", temp.getTaxCode());
-        assertEquals("OK", temp.getCheckStato());
+        assertEquals("12345678901", saved.getCodIntermediario());
+        assertEquals("OK", saved.getCheckStato());
     }
 
     @Test
@@ -93,11 +83,8 @@ class EcSyncWriterTest {
         verify(repository).save(cacheCaptor.capture());
         assertEquals(1L, cacheCaptor.getValue().getId());
         assertEquals("Comune di Alfa", cacheCaptor.getValue().getDenominazione());
-
-        ArgumentCaptor<EcCheckEntity> tempCaptor = ArgumentCaptor.forClass(EcCheckEntity.class);
-        verify(ecCheckRepository).save(tempCaptor.capture());
-        assertEquals("INFO_DIVERSE", tempCaptor.getValue().getCheckStato());
-        assertEquals("Presenza di differenze: RagioneSociale", tempCaptor.getValue().getCheckMotivo());
+        assertEquals("INFO_DIVERSE", cacheCaptor.getValue().getCheckStato());
+        assertEquals("Presenza di differenze: RagioneSociale", cacheCaptor.getValue().getCheckMotivo());
     }
 
     @Test
@@ -111,6 +98,5 @@ class EcSyncWriterTest {
         writer.write(new Chunk<>(java.util.List.of(ente1, ente2)));
 
         verify(repository, org.mockito.Mockito.times(2)).save(any());
-        verify(ecCheckRepository, org.mockito.Mockito.times(2)).save(any());
     }
 }

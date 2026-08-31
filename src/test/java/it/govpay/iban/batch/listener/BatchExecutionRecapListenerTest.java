@@ -71,15 +71,6 @@ class BatchExecutionRecapListenerTest {
     }
 
     @Test
-    void afterJob_withCleanupStep_shouldPrintStats() {
-        JobExecution jobExecution = createJobExecution();
-        StepExecution cleanupStep = createStepExecution(jobExecution, "cleanupStep");
-        jobExecution.addStepExecutions(List.of(cleanupStep));
-
-        assertDoesNotThrow(() -> listener.afterJob(jobExecution));
-    }
-
-    @Test
     void afterJob_withWorkerSteps_shouldPrintPerIntermediarioStats() {
         JobExecution jobExecution = createJobExecution();
 

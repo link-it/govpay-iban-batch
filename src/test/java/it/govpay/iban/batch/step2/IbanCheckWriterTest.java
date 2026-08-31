@@ -33,15 +33,10 @@ import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.FileStorageConfig;
 import it.govpay.iban.batch.dto.IbanPagopa;
 import it.govpay.iban.batch.entity.IbanCacheEntity;
-import it.govpay.iban.batch.entity.PagopaIbanCheckEntity;
 import it.govpay.iban.batch.repository.IbanCacheRepository;
-import it.govpay.iban.batch.repository.PagopaIbanCheckRepository;
 
 @ExtendWith(MockitoExtension.class)
 class IbanCheckWriterTest {
-
-    @Mock
-    private PagopaIbanCheckRepository pagopaIbanCheckRepository;
 
     @Mock
     private IbanCacheRepository ibanCacheRepository;
@@ -60,7 +55,7 @@ class IbanCheckWriterTest {
 
     @BeforeEach
     void setUp() {
-        writer = new IbanCheckWriter(pagopaIbanCheckRepository, ibanCacheRepository, fileStorageConfig, ZONE_ID);
+        writer = new IbanCheckWriter(ibanCacheRepository, fileStorageConfig, ZONE_ID);
         ReflectionTestUtils.setField(writer, "codIntermediario", COD_INTERMEDIARIO);
         lenient().when(ibanCacheRepository.findByCodDominioAndIban(any(), any())).thenReturn(Optional.empty());
     }
@@ -84,32 +79,6 @@ class IbanCheckWriterTest {
         JobInstance jobInstance = new JobInstance(1L, "ibanCheckJob");
         JobExecution jobExecution = new JobExecution(1L, jobInstance, new JobParameters());
         return new StepExecution("ibanCheckWorkerStep", jobExecution);
-    }
-
-    @Test
-    void write_shouldSaveEntityToRepository() throws Exception {
-        when(fileStorageConfig.getReportDirectory()).thenReturn(tempDir);
-
-        StepExecution stepExecution = createStepExecution();
-        writer.beforeStep(stepExecution);
-
-        IbanPagopa iban = createIbanPagopa(Costanti.CHECK_OK);
-        writer.write(new Chunk<>(iban));
-
-        ArgumentCaptor<PagopaIbanCheckEntity> captor = ArgumentCaptor.forClass(PagopaIbanCheckEntity.class);
-        verify(pagopaIbanCheckRepository).save(captor.capture());
-
-        PagopaIbanCheckEntity saved = captor.getValue();
-        assertEquals(COD_INTERMEDIARIO, saved.getBrokerCode());
-        assertEquals("01234567890", saved.getCiFiscalCode());
-        assertEquals("Comune Test", saved.getCiName());
-        assertEquals("IT60X0542811101000000123456", saved.getIban());
-        assertEquals("ENABLED", saved.getStatus());
-        assertEquals("Conto corrente", saved.getDescription());
-        assertEquals("label-test", saved.getLabel());
-        assertEquals(Costanti.CHECK_OK, saved.getCheckStato());
-
-        writer.afterStep();
     }
 
     @Test
@@ -161,6 +130,12 @@ class IbanCheckWriterTest {
         assertEquals("IT60X0542811101000000123456", saved.getIban());
         assertTrue(saved.getAttivo());
         assertNotNull(saved.getDataUltimaVerifica());
+        assertEquals(COD_INTERMEDIARIO, saved.getCodIntermediario());
+        assertEquals("Comune Test", saved.getCiName());
+        assertEquals("ENABLED", saved.getStatus());
+        assertEquals("Conto corrente", saved.getDescription());
+        assertEquals("label-test", saved.getLabel());
+        assertEquals(Costanti.CHECK_OK, saved.getCheckStato());
 
         writer.afterStep();
     }
@@ -224,7 +199,7 @@ class IbanCheckWriterTest {
         IbanPagopa iban3 = createIbanPagopa(Costanti.CHECK_OK);
         writer.write(new Chunk<>(iban1, iban2, iban3));
 
-        verify(pagopaIbanCheckRepository, times(3)).save(any(PagopaIbanCheckEntity.class));
+        verify(ibanCacheRepository, times(3)).save(any(IbanCacheEntity.class));
         assertEquals(3, stepExecution.getExecutionContext().getInt(IbanCheckWriter.STATS_SAVED_COUNT));
         assertEquals(2, stepExecution.getExecutionContext().getInt(IbanCheckWriter.STATS_NO_CHANGE_COUNT));
 
