@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -57,7 +58,7 @@ class EntiCreditoriApiServiceTest {
     private void stubApi() {
         lenient().when(pagoPaApiClientFactory.getOrCreateApi(COD_INTERMEDIARIO)).thenReturn(externalApisApi);
         lenient().when(pagoPaApiClientFactory.getBaseUrl(COD_INTERMEDIARIO)).thenReturn("https://api.pagopa.it");
-        lenient().when(batchProperties.getPageSize()).thenReturn(1000);
+        lenient().when(batchProperties.getPageSize()).thenReturn(100);
     }
 
     private BrokerInstitutionResource createResource(String taxCode, String companyName) {
@@ -78,7 +79,7 @@ class EntiCreditoriApiServiceTest {
         pageInfo.setPage(page);
         pageInfo.setTotalPages(totalPages);
         pageInfo.setTotalElements((long) enti.size());
-        pageInfo.setLimit(1000);
+        pageInfo.setLimit(100);
         response.setPageInfo(pageInfo);
         return response;
     }
@@ -102,9 +103,9 @@ class EntiCreditoriApiServiceTest {
 
         BrokerInstitutionResource ente1 = createResource("77777777777", "Comune di Alfa");
         BrokerInstitutionResource ente2 = createResource("88888888888", "Comune di Beta");
-        BrokerInstitutionsResponse response = createResponse(List.of(ente1, ente2), 1, 1);
+        BrokerInstitutionsResponse response = createResponse(List.of(ente1, ente2), 0, 1);
 
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
 
         List<EnteCreditorePagopa> result = service.getAllEntiCreditori(COD_INTERMEDIARIO);
@@ -125,12 +126,12 @@ class EntiCreditoriApiServiceTest {
     void getAllEntiCreditori_multiPage_shouldPaginateAndReturnAll() throws Exception {
         stubApi();
 
-        BrokerInstitutionsResponse page1 = createResponse(List.of(createResource("77777777777", "Comune di Alfa")), 1, 2);
-        BrokerInstitutionsResponse page2 = createResponse(List.of(createResource("88888888888", "Comune di Beta")), 2, 2);
+        BrokerInstitutionsResponse page1 = createResponse(List.of(createResource("77777777777", "Comune di Alfa")), 0, 2);
+        BrokerInstitutionsResponse page2 = createResponse(List.of(createResource("88888888888", "Comune di Beta")), 1, 2);
 
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(page1, HttpStatus.OK));
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(2), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(page2, HttpStatus.OK));
 
         List<EnteCreditorePagopa> result = service.getAllEntiCreditori(COD_INTERMEDIARIO);
@@ -138,13 +139,19 @@ class EntiCreditoriApiServiceTest {
         assertEquals(2, result.size());
         assertEquals("77777777777", result.get(0).getTaxCode());
         assertEquals("88888888888", result.get(1).getTaxCode());
+
+        // Le pagine dell'API pagoPA sono 0-based: la prima richiesta e' la 0 e con
+        // totalPages = 2 l'ultima e' la 1, senza una terza chiamata fuori range.
+        verify(externalApisApi).getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any());
+        verify(externalApisApi).getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(100), any());
+        verifyNoMoreInteractions(externalApisApi);
     }
 
     @Test
     void getAllEntiCreditori_nullBody_shouldReturnEmptyList() throws Exception {
         stubApi();
 
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>((BrokerInstitutionsResponse) null, HttpStatus.OK));
 
         List<EnteCreditorePagopa> result = service.getAllEntiCreditori(COD_INTERMEDIARIO);
@@ -157,7 +164,7 @@ class EntiCreditoriApiServiceTest {
     void getAllEntiCreditori_resourceAccessExceptionClosed_shouldReturnEmptyList() throws Exception {
         stubApi();
 
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenThrow(new ResourceAccessException("I/O error: connection closed"));
 
         List<EnteCreditorePagopa> result = service.getAllEntiCreditori(COD_INTERMEDIARIO);
@@ -170,7 +177,7 @@ class EntiCreditoriApiServiceTest {
     void getAllEntiCreditori_resourceAccessExceptionGeneric_shouldThrowAndCallGdeKo() throws Exception {
         stubApi();
 
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenThrow(new ResourceAccessException("I/O error: connection timeout"));
 
         assertThrows(RestClientException.class, () -> service.getAllEntiCreditori(COD_INTERMEDIARIO));
@@ -182,7 +189,7 @@ class EntiCreditoriApiServiceTest {
     void getAllEntiCreditori_genericException_shouldWrapInRestClientExceptionAndCallGdeKo() throws Exception {
         stubApi();
 
-        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerInstitutionsWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenThrow(new RuntimeException("Unexpected error"));
 
         RestClientException thrown = assertThrows(RestClientException.class,
