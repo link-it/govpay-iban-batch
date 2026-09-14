@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
@@ -102,7 +103,7 @@ class IbanPagopaApiServiceTest {
         lenient().when(connettoreService.getConnettore(COD_CONNETTORE)).thenReturn(connettore);
 
         // Stub pageSize
-        lenient().when(batchProperties.getPageSize()).thenReturn(1000);
+        lenient().when(batchProperties.getPageSize()).thenReturn(100);
     }
 
     private CIIbansResource createIbanResource(String iban, String fiscalCode, String name) {
@@ -124,7 +125,7 @@ class IbanPagopaApiServiceTest {
         pageInfo.setPage(page);
         pageInfo.setTotalPages(totalPages);
         pageInfo.setTotalElements((long) ibans.size());
-        pageInfo.setLimit(1000);
+        pageInfo.setLimit(100);
         response.setPageInfo(pageInfo);
         return response;
     }
@@ -163,9 +164,9 @@ class IbanPagopaApiServiceTest {
 
         CIIbansResource iban1 = createIbanResource("IT60X0542811101000000123456", "01234567890", "Comune A");
         CIIbansResource iban2 = createIbanResource("IT60X0542811101000000789012", "09876543210", "Comune B");
-        CIIbansResponse response = createResponse(List.of(iban1, iban2), 1, 1);
+        CIIbansResponse response = createResponse(List.of(iban1, iban2), 0, 1);
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
@@ -189,14 +190,14 @@ class IbanPagopaApiServiceTest {
         injectMockApi();
 
         CIIbansResource iban1 = createIbanResource("IT11111111111111111111111111", "01234567890", "Comune A");
-        CIIbansResponse page1 = createResponse(List.of(iban1), 1, 2);
+        CIIbansResponse page1 = createResponse(List.of(iban1), 0, 2);
 
         CIIbansResource iban2 = createIbanResource("IT22222222222222222222222222", "09876543210", "Comune B");
-        CIIbansResponse page2 = createResponse(List.of(iban2), 2, 2);
+        CIIbansResponse page2 = createResponse(List.of(iban2), 1, 2);
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(page1, HttpStatus.OK));
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(2), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(page2, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
@@ -204,6 +205,12 @@ class IbanPagopaApiServiceTest {
         assertEquals(2, result.size());
         assertEquals("IT11111111111111111111111111", result.get(0).getIban());
         assertEquals("IT22222222222222222222222222", result.get(1).getIban());
+
+        // Le pagine dell'API pagoPA sono 0-based: la prima richiesta e' la 0 e con
+        // totalPages = 2 l'ultima e' la 1, senza una terza chiamata fuori range.
+        verify(externalApisApi).getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any());
+        verify(externalApisApi).getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(100), any());
+        verifyNoMoreInteractions(externalApisApi);
     }
 
     // ============ Response with null body ============
@@ -212,7 +219,7 @@ class IbanPagopaApiServiceTest {
     void getAllIbans_nullBody_shouldReturnEmptyList() throws Exception {
         injectMockApi();
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(null, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
@@ -227,8 +234,8 @@ class IbanPagopaApiServiceTest {
     void getAllIbans_emptyIbansList_shouldReturnEmptyList() throws Exception {
         injectMockApi();
 
-        CIIbansResponse response = createResponse(List.of(), 1, 1);
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        CIIbansResponse response = createResponse(List.of(), 0, 1);
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
@@ -249,7 +256,7 @@ class IbanPagopaApiServiceTest {
         pageInfo.setTotalPages(1L);
         response.setPageInfo(pageInfo);
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
@@ -263,7 +270,7 @@ class IbanPagopaApiServiceTest {
     void getAllIbans_resourceAccessExceptionClosed_shouldReturnEmptyList() throws Exception {
         injectMockApi();
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenThrow(new ResourceAccessException("I/O error: connection closed"));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);
@@ -279,7 +286,7 @@ class IbanPagopaApiServiceTest {
     void getAllIbans_resourceAccessExceptionGeneric_shouldThrowAndCallGdeKo() throws Exception {
         injectMockApi();
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenThrow(new ResourceAccessException("I/O error: connection timeout"));
 
         assertThrows(RestClientException.class, () -> service.getAllIbans(COD_INTERMEDIARIO));
@@ -293,7 +300,7 @@ class IbanPagopaApiServiceTest {
     void getAllIbans_genericException_shouldWrapInRestClientExceptionAndCallGdeKo() throws Exception {
         injectMockApi();
 
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenThrow(new RuntimeException("Unexpected error"));
 
         RestClientException thrown = assertThrows(RestClientException.class,
@@ -309,9 +316,9 @@ class IbanPagopaApiServiceTest {
     void getAllIbans_calledTwice_shouldReuseApiFromCache() throws Exception {
         injectMockApi();
 
-        CIIbansResponse response = createResponse(List.of(), 1, 1);
+        CIIbansResponse response = createResponse(List.of(), 0, 1);
         // Use lenient since called twice
-        lenient().when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        lenient().when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
 
         service.getAllIbans(COD_INTERMEDIARIO);
@@ -341,8 +348,8 @@ class IbanPagopaApiServiceTest {
         resource.setLabel("LABEL");
         resource.setValidityDate(validityDate);
 
-        CIIbansResponse response = createResponse(List.of(resource), 1, 1);
-        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(1), eq(1000), any()))
+        CIIbansResponse response = createResponse(List.of(resource), 0, 1);
+        when(externalApisApi.getBrokerIbansWithHttpInfo(eq(COD_INTERMEDIARIO), eq(0), eq(100), any()))
                 .thenReturn(new ResponseEntity<>(response, HttpStatus.OK));
 
         List<IbanPagopa> result = service.getAllIbans(COD_INTERMEDIARIO);

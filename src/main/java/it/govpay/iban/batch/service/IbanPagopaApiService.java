@@ -119,7 +119,8 @@ public class IbanPagopaApiService {
 
 	private ResponseEntity<CIIbansResponse> fetchIbansLoop(String codIntermediario, List<IbanPagopa> allIbans) {
 		ResponseEntity<CIIbansResponse> lastResponseEntity = null;
-        Long currentPage = 1L;
+        // Le pagine dell'API di backoffice pagoPA sono 0-based: "Page value starts from 0".
+        Long currentPage = 0L;
         boolean hasMorePages = true;
 
 		while (hasMorePages) {
@@ -136,7 +137,10 @@ public class IbanPagopaApiService {
 		        logInfoResponseOk(codIntermediario, response);
 		        aggiungiIbanRicevutiAllElenco(codIntermediario, allIbans, currentPage, response);
 
-		        hasMorePages = response.getPageInfo().getPage() < response.getPageInfo().getTotalPages();
+		        // Confronto sulla pagina richiesta, non su quella riportata in risposta: e'
+		        // monotona crescente, quindi il ciclo termina anche se l'API non la rimanda
+		        // indietro fedelmente. currentPage e' 0-based, totalPages e' un conteggio.
+		        hasMorePages = currentPage + 1 < response.getPageInfo().getTotalPages();
 		        currentPage++;
 		    }
 		}

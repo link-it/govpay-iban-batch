@@ -1,3 +1,22 @@
+2026-09-14  Giuliano Pintori <pintori@link.it>
+
+	* [IbanPagopaApiService]
+	Risolto Bug - paginazione delle API di backoffice pagoPA. Le pagine sono
+	0-based ("Page value starts from 0" sul parametro di query, "0 is the first
+	page" su PageInfo.page), mentre il ciclo partiva da 1: la prima pagina non
+	veniva mai richiesta e i primi page-size IBAN di ogni intermediario venivano
+	persi senza alcuna segnalazione. La condizione di uscita "page < totalPages",
+	con page 1-based, faceva inoltre richiedere in coda la pagina totalPages,
+	fuori range. Il ciclo parte ora da 0 ed esce su "currentPage + 1 <
+	totalPages", valutata sulla pagina richiesta e non su quella riportata in
+	risposta, cosi' da restare monotona e terminare comunque.
+
+	* [Configurazione]
+	Risolto Bug - il default di govpay.batch.page-size passa da 1000 a 100: l'API
+	di backoffice pagoPA dichiara il parametro "limit" con maximum 100, quindi il
+	valore precedente veniva rifiutato con HTTP 400 ("getBrokerIbans.limit: must
+	be less than or equal to 100"), facendo fallire lo step ibanCheckAcquisitionStep.
+
 2026-05-12  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]
