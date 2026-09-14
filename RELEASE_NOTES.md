@@ -9,6 +9,8 @@ Release di manutenzione: correzione della paginazione verso le API di backoffice
 - **Prima pagina persa**: le pagine dell'API sono 0-based (`Page value starts from 0` sul parametro di query, `0 is the first page` su `PageInfo.page`), mentre il ciclo di `IbanPagopaApiService` partiva da 1. La pagina 0 non veniva mai richiesta: i primi `page-size` IBAN di ogni intermediario venivano scartati senza alcuna segnalazione e, con una sola pagina di risultati, la lista tornava vuota.
 - **Chiamata fuori range in coda**: la condizione di uscita `page < totalPages`, valutata su un indice 1-based, faceva richiedere la pagina `totalPages` (inesistente in numerazione 0-based). Il ciclo esce ora su `currentPage + 1 < totalPages`, valutata sulla pagina richiesta e non su quella riportata in risposta, così da restare monotona e terminare anche se l'API non rimanda indietro fedelmente il numero di pagina.
 
+- **Intermediari senza connettore**: `IntermediarioPartitioner` creava una partizione per ogni riga di `INTERMEDIARI`, senza verificare `COD_CONNETTORE_BACKOFFICE_EC`. Per un intermediario non configurato per il controllo IBAN la risoluzione del connettore sollevava `IllegalStateException`, riavvolta in `RestClientException`: la partizione andava in errore e faceva fallire l'intero `ibanCheckJob`. Questi intermediari vengono ora esclusi dalle partizioni e segnalati con un warning nei log.
+
 ### Compatibilità
 Nessuna breaking change. Aggiornamento drop-in rispetto alla 1.0.2.
 

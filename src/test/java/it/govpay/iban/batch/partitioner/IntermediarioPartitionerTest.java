@@ -1,6 +1,7 @@
 package it.govpay.iban.batch.partitioner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -33,8 +34,13 @@ class IntermediarioPartitionerTest {
     }
 
     private IntermediarioEntity createIntermediario(String codIntermediario) {
+        return createIntermediario(codIntermediario, codIntermediario + "_BOEC");
+    }
+
+    private IntermediarioEntity createIntermediario(String codIntermediario, String codConnettoreBackofficeEc) {
         return IntermediarioEntity.builder()
                 .codIntermediario(codIntermediario)
+                .codConnettoreBackofficeEc(codConnettoreBackofficeEc)
                 .abilitato(true)
                 .build();
     }
@@ -97,5 +103,57 @@ class IntermediarioPartitionerTest {
         assertNotNull(ctx);
         assertEquals(1, ctx.getInt("partitionNumber"));
         assertEquals(1, ctx.getInt("totalPartitions"));
+    }
+
+    // ============ Filtro sul connettore di backoffice EC ============
+
+    @Test
+    void partition_withIntermediariesWithoutConnector_shouldSkipThem() {
+        List<IntermediarioEntity> intermediari = List.of(
+                createIntermediario("11111111111"),
+                createIntermediario("22222222222", null),
+                createIntermediario("33333333333", "   "),
+                createIntermediario("44444444444"));
+        when(intermediarioRepository.findAll()).thenReturn(intermediari);
+
+        Map<String, ExecutionContext> partitions = partitioner.partition(5);
+
+        // Senza connettore di backoffice EC non c'e' nulla da interrogare: gli
+        // intermediari non configurati vengono saltati invece di far fallire il job.
+        assertEquals(2, partitions.size());
+        assertTrue(partitions.containsKey("partition-11111111111"));
+        assertTrue(partitions.containsKey("partition-44444444444"));
+        assertFalse(partitions.containsKey("partition-22222222222"));
+        assertFalse(partitions.containsKey("partition-33333333333"));
+    }
+
+    @Test
+    void partition_withIntermediariesWithoutConnector_shouldNumberOnlyKeptPartitions() {
+        List<IntermediarioEntity> intermediari = List.of(
+                createIntermediario("11111111111", null),
+                createIntermediario("22222222222"),
+                createIntermediario("33333333333"));
+        when(intermediarioRepository.findAll()).thenReturn(intermediari);
+
+        Map<String, ExecutionContext> partitions = partitioner.partition(5);
+
+        // La numerazione e' progressiva sulle sole partizioni create e totalPartitions
+        // conta quelle, non gli intermediari letti da database.
+        assertEquals(2, partitions.size());
+        assertEquals(1, partitions.get("partition-22222222222").getInt("partitionNumber"));
+        assertEquals(2, partitions.get("partition-22222222222").getInt("totalPartitions"));
+        assertEquals(2, partitions.get("partition-33333333333").getInt("partitionNumber"));
+        assertEquals(2, partitions.get("partition-33333333333").getInt("totalPartitions"));
+    }
+
+    @Test
+    void partition_withNoIntermediaryHavingConnector_shouldReturnEmptyMap() {
+        when(intermediarioRepository.findAll()).thenReturn(List.of(
+                createIntermediario("11111111111", null),
+                createIntermediario("22222222222", "")));
+
+        Map<String, ExecutionContext> partitions = partitioner.partition(5);
+
+        assertTrue(partitions.isEmpty());
     }
 }

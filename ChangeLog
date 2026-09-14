@@ -14,6 +14,16 @@
 	totalPages", valutata sulla pagina richiesta e non su quella riportata in
 	risposta, cosi' da restare monotona e terminare comunque.
 
+	* [IntermediarioPartitioner]
+	Risolto Bug - gli intermediari privi di connettore di backoffice EC facevano
+	fallire il job. Il partitioner creava una partizione per ogni riga di
+	INTERMEDIARI, ma la risoluzione del connettore solleva IllegalStateException
+	quando COD_CONNETTORE_BACKOFFICE_EC non e' valorizzato: l'eccezione veniva
+	riavvolta in RestClientException, la partizione andava in errore e con essa
+	l'intero ibanCheckJob. Un intermediario non configurato per il controllo IBAN
+	viene ora escluso dalle partizioni e segnalato con un warning, invece di
+	bloccare la verifica di tutti gli altri.
+
 	* [Configurazione]
 	Risolto Bug - il default di govpay.batch.page-size passa da 1000 a 100: l'API
 	di backoffice pagoPA dichiara il parametro "limit" con maximum 100, quindi il
