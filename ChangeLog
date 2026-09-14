@@ -1,5 +1,8 @@
 2026-09-14  Giuliano Pintori <pintori@link.it>
 
+	* [ProjectSetup]
+	Avanzata versione del progetto a 1.0.3.
+
 	* [IbanPagopaApiService]
 	Risolto Bug - paginazione delle API di backoffice pagoPA. Le pagine sono
 	0-based ("Page value starts from 0" sul parametro di query, "0 is the first

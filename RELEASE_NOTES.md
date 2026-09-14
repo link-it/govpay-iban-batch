@@ -1,5 +1,21 @@
 # Release Notes
 
+## 1.0.3 — 2026-09-14
+
+Release di manutenzione: correzione della paginazione verso le API di backoffice pagoPA.
+
+### Correzioni
+- **`limit` fuori range**: il default di `govpay.batch.page-size` passa da `1000` a `100`. La specifica di backoffice pagoPA dichiara il parametro `limit` con `maximum: 100`, quindi `getBrokerIbans` rispondeva `400 Bad Request` (`getBrokerIbans.limit: must be less than or equal to 100`) facendo fallire lo step `ibanCheckAcquisitionStep` del job `ibanCheckJob`.
+- **Prima pagina persa**: le pagine dell'API sono 0-based (`Page value starts from 0` sul parametro di query, `0 is the first page` su `PageInfo.page`), mentre il ciclo di `IbanPagopaApiService` partiva da 1. La pagina 0 non veniva mai richiesta: i primi `page-size` IBAN di ogni intermediario venivano scartati senza alcuna segnalazione e, con una sola pagina di risultati, la lista tornava vuota.
+- **Chiamata fuori range in coda**: la condizione di uscita `page < totalPages`, valutata su un indice 1-based, faceva richiedere la pagina `totalPages` (inesistente in numerazione 0-based). Il ciclo esce ora su `currentPage + 1 < totalPages`, valutata sulla pagina richiesta e non su quella riportata in risposta, così da restare monotona e terminare anche se l'API non rimanda indietro fedelmente il numero di pagina.
+
+### Compatibilità
+Nessuna breaking change. Aggiornamento drop-in rispetto alla 1.0.2.
+
+**Attenzione**: chi avesse sovrascritto `govpay.batch.page-size` con un valore superiore a 100 (via properties o variabile d'ambiente) deve riportarlo a un valore ≤ 100, altrimenti l'errore 400 si ripresenta nonostante l'aggiornamento.
+
+**Nota sui dati**: dopo l'aggiornamento il primo giro del job acquisisce IBAN che le versioni precedenti non avevano mai letto, quindi è atteso un incremento delle righe elaborate rispetto alle esecuzioni storiche.
+
 ## 1.0.2 — 2026-05-12
 
 Release di manutenzione: pulizia configurazione logging.
