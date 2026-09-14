@@ -1,5 +1,33 @@
 2026-09-14  Giuliano Pintori <pintori@link.it>
 
+	* [IntermediarioPartitioner]
+	Risolto Bug - gli intermediari privi di connettore di backoffice EC facevano
+	fallire il job. Il partitioner creava una partizione per ogni riga di
+	INTERMEDIARI, ma la risoluzione del connettore solleva IllegalStateException
+	quando COD_CONNETTORE_BACKOFFICE_EC non e' valorizzato: l'eccezione veniva
+	riavvolta in RestClientException, la partizione andava in errore e con essa
+	l'intero ibanCheckJob. Un intermediario non configurato per il controllo IBAN
+	viene ora escluso dalle partizioni e segnalato con un warning, invece di
+	bloccare la verifica di tutti gli altri.
+	Riporta sulla linea 2.x la correzione fatta sulla 1.x.
+
+	* [IbanCheckWriter]
+	Risolto Bug - il report CSV era inutilizzabile. CsvRowGenerator restituisce la
+	sola riga, senza terminatore, ma il writer la scriveva cosi' com'e': tutti i
+	record finivano concatenati su un'unica riga e il file non conteneva nemmeno un
+	a capo. Ogni record viene ora terminato da un newline, fisso e non dipendente
+	dalla piattaforma. La scrittura usa esplicitamente UTF-8 invece del charset di
+	default della JVM, cosi' le denominazioni accentate che arrivano da pagoPA
+	restano leggibili anche su installazioni con default diverso.
+	Riporta sulla linea 2.x la correzione fatta sulla 1.x.
+
+	* [Pipeline]
+	Aggiornata SonarSource/sonarqube-scan-action da v5 a v6: GitHub annota le
+	esecuzioni con v5 come non piu' supportate e affette da una vulnerabilita' di
+	sicurezza.
+
+2026-09-14  Giuliano Pintori <pintori@link.it>
+
 	* [DDL]
 	Gli schemi dei metadati Spring Batch non sono piu' mantenuti in questo
 	repository. Rimossi gli schemi tenuti a mano
