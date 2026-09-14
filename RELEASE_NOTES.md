@@ -11,6 +11,8 @@ Release di manutenzione: correzione della paginazione verso le API di backoffice
 
 - **Intermediari senza connettore**: `IntermediarioPartitioner` creava una partizione per ogni riga di `INTERMEDIARI`, senza verificare `COD_CONNETTORE_BACKOFFICE_EC`. Per un intermediario non configurato per il controllo IBAN la risoluzione del connettore sollevava `IllegalStateException`, riavvolta in `RestClientException`: la partizione andava in errore e faceva fallire l'intero `ibanCheckJob`. Questi intermediari vengono ora esclusi dalle partizioni e segnalati con un warning nei log.
 
+- **Report CSV su una sola riga**: `CsvRowGenerator` restituisce la riga senza terminatore e `IbanCheckWriter` la scriveva tale e quale, quindi tutti i record del report finivano concatenati su un'unica riga, senza alcun a capo nel file. Ogni record e' ora terminato da un newline e la scrittura avviene esplicitamente in UTF-8 invece che nel charset di default della JVM, così le denominazioni accentate restituite da pagoPA restano leggibili.
+
 ### Compatibilità
 Nessuna breaking change. Aggiornamento drop-in rispetto alla 1.0.2.
 

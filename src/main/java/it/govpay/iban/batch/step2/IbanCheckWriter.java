@@ -3,6 +3,7 @@ package it.govpay.iban.batch.step2;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +35,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     public static final List<String> OUTPUT_HEADERS = List.of("codFiscale", "name", "iban", "status", "validityDate", "descrizione", "label", "checkStato", "checkMotivo");
+
+    /** Terminatore di riga del report: fisso e non dipendente dalla piattaforma, cosi' il file e' identico ovunque giri il batch. */
+    private static final String CSV_LINE_SEPARATOR = "\n";
 
     public static final String STATS_SAVED_COUNT = "ibansSavedCount";
     public static final String STATS_NO_CHANGE_COUNT = "ibansNoChangeCount";
@@ -151,7 +155,10 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
 
             String csvRow = csvRowGenerator.generateCsvRow(outputData, OUTPUT_HEADERS);
             log.info("Generated row: {}", csvRow);
-            reportOS.write(csvRow.getBytes());
+            // generateCsvRow restituisce la sola riga, senza terminatore: senza aggiungerlo
+            // qui i record finirebbero tutti concatenati su un'unica riga. La codifica e'
+            // esplicita perche' le denominazioni che arrivano da pagoPA contengono accenti.
+            reportOS.write((csvRow + CSV_LINE_SEPARATOR).getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.error("Error producing CSV row from json", e);
         }

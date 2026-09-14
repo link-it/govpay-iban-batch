@@ -24,6 +24,15 @@
 	viene ora escluso dalle partizioni e segnalato con un warning, invece di
 	bloccare la verifica di tutti gli altri.
 
+	* [IbanCheckWriter]
+	Risolto Bug - il report CSV era inutilizzabile. CsvRowGenerator restituisce la
+	sola riga, senza terminatore, ma il writer la scriveva cosi' com'e': tutti i
+	record finivano concatenati su un'unica riga e il file non conteneva nemmeno un
+	a capo. Ogni record viene ora terminato da un newline, fisso e non dipendente
+	dalla piattaforma. La scrittura usa esplicitamente UTF-8 invece del charset di
+	default della JVM, cosi' le denominazioni accentate che arrivano da pagoPA
+	restano leggibili anche su installazioni con default diverso.
+
 	* [Configurazione]
 	Risolto Bug - il default di govpay.batch.page-size passa da 1000 a 100: l'API
 	di backoffice pagoPA dichiara il parametro "limit" con maximum 100, quindi il
