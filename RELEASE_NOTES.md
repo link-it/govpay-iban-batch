@@ -2,16 +2,19 @@
 
 ## 1.0.3 — 2026-09-14
 
-Release di manutenzione: correzione della paginazione verso le API di backoffice pagoPA.
+Release di manutenzione. Corregge tre difetti che impedivano al job `ibanCheckJob` di completare e di produrre un report leggibile: la paginazione verso le API di backoffice pagoPA, la partizione per intermediario e la scrittura del report CSV.
 
-### Correzioni
-- **`limit` fuori range**: il default di `govpay.batch.page-size` passa da `1000` a `100`. La specifica di backoffice pagoPA dichiara il parametro `limit` con `maximum: 100`, quindi `getBrokerIbans` rispondeva `400 Bad Request` (`getBrokerIbans.limit: must be less than or equal to 100`) facendo fallire lo step `ibanCheckAcquisitionStep` del job `ibanCheckJob`.
+### Paginazione API pagoPA
+- **`limit` fuori range**: il default di `govpay.batch.page-size` passa da `1000` a `100`. La specifica di backoffice pagoPA dichiara il parametro `limit` con `maximum: 100`, quindi `getBrokerIbans` rispondeva `400 Bad Request` (`getBrokerIbans.limit: must be less than or equal to 100`) facendo fallire lo step `ibanCheckAcquisitionStep`.
 - **Prima pagina persa**: le pagine dell'API sono 0-based (`Page value starts from 0` sul parametro di query, `0 is the first page` su `PageInfo.page`), mentre il ciclo di `IbanPagopaApiService` partiva da 1. La pagina 0 non veniva mai richiesta: i primi `page-size` IBAN di ogni intermediario venivano scartati senza alcuna segnalazione e, con una sola pagina di risultati, la lista tornava vuota.
-- **Chiamata fuori range in coda**: la condizione di uscita `page < totalPages`, valutata su un indice 1-based, faceva richiedere la pagina `totalPages` (inesistente in numerazione 0-based). Il ciclo esce ora su `currentPage + 1 < totalPages`, valutata sulla pagina richiesta e non su quella riportata in risposta, così da restare monotona e terminare anche se l'API non rimanda indietro fedelmente il numero di pagina.
+- **Chiamata fuori range in coda**: la condizione di uscita `page < totalPages`, valutata su un indice 1-based, faceva richiedere la pagina `totalPages`, inesistente in numerazione 0-based. Il ciclo esce ora su `currentPage + 1 < totalPages`, valutata sulla pagina richiesta e non su quella riportata in risposta, così da restare monotona e terminare anche se l'API non rimanda indietro fedelmente il numero di pagina.
 
-- **Intermediari senza connettore**: `IntermediarioPartitioner` creava una partizione per ogni riga di `INTERMEDIARI`, senza verificare `COD_CONNETTORE_BACKOFFICE_EC`. Per un intermediario non configurato per il controllo IBAN la risoluzione del connettore sollevava `IllegalStateException`, riavvolta in `RestClientException`: la partizione andava in errore e faceva fallire l'intero `ibanCheckJob`. Questi intermediari vengono ora esclusi dalle partizioni e segnalati con un warning nei log.
+### Esecuzione del job
+- **Intermediari senza connettore**: `IntermediarioPartitioner` creava una partizione per ogni riga di `INTERMEDIARI`, senza verificare `COD_CONNETTORE_BACKOFFICE_EC`. Per un intermediario non configurato per il controllo IBAN la risoluzione del connettore sollevava `IllegalStateException`, riavvolta in `RestClientException`: la partizione andava in errore e faceva fallire l'intero `ibanCheckJob`. Bastava quindi un solo intermediario privo di quel connettore — situazione ordinaria, dato che serve solo a chi usa il controllo IBAN — per impedire la verifica di tutti gli altri. Questi intermediari vengono ora esclusi dalle partizioni e segnalati una volta sola con un warning che ne elenca i codici.
 
-- **Report CSV su una sola riga**: `CsvRowGenerator` restituisce la riga senza terminatore e `IbanCheckWriter` la scriveva tale e quale, quindi tutti i record del report finivano concatenati su un'unica riga, senza alcun a capo nel file. Ogni record e' ora terminato da un newline e la scrittura avviene esplicitamente in UTF-8 invece che nel charset di default della JVM, così le denominazioni accentate restituite da pagoPA restano leggibili.
+### Report CSV
+- **Record concatenati su un'unica riga**: `CsvRowGenerator` restituisce la riga senza terminatore e `IbanCheckWriter` la scriveva tale e quale, quindi tutti i record finivano accodati l'uno all'altro e il file non conteneva nemmeno un a capo. Ogni record è ora terminato da un newline, fisso e non dipendente dalla piattaforma, così il file è identico ovunque giri il batch.
+- **Codifica del report**: la conversione in byte usava il charset di default della JVM, corrompendo le denominazioni accentate restituite da pagoPA su installazioni con default diverso da UTF-8. La codifica è ora esplicita.
 
 ### Compatibilità
 Nessuna breaking change. Aggiornamento drop-in rispetto alla 1.0.2.
@@ -19,6 +22,10 @@ Nessuna breaking change. Aggiornamento drop-in rispetto alla 1.0.2.
 **Attenzione**: chi avesse sovrascritto `govpay.batch.page-size` con un valore superiore a 100 (via properties o variabile d'ambiente) deve riportarlo a un valore ≤ 100, altrimenti l'errore 400 si ripresenta nonostante l'aggiornamento.
 
 **Nota sui dati**: dopo l'aggiornamento il primo giro del job acquisisce IBAN che le versioni precedenti non avevano mai letto, quindi è atteso un incremento delle righe elaborate rispetto alle esecuzioni storiche.
+
+**Nota sul monitoraggio**: un `ibanCheckJob` che prima falliva per un intermediario non configurato ora completa saltandolo. Chi presidiava l'esito del job come indicatore di configurazione mancante deve guardare il warning `Esclusi N intermediari su M privi di connettore di backoffice EC`, che ne elenca i codici.
+
+**Nota per chi elabora il report**: il CSV prodotto era finora una singola riga con tutti i record concatenati; ora ha un record per riga. Eventuali script che ne consumavano l'output vanno verificati.
 
 ## 1.0.2 — 2026-05-12
 
