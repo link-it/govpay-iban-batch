@@ -1,5 +1,28 @@
 2026-09-14  Giuliano Pintori <pintori@link.it>
 
+	* [Pipeline]
+	Risolto Bug - l'analisi SonarCloud non veniva piu' eseguita.
+	SonarSource/sonarcloud-github-action@v2 e' deprecata e la sua immagine esegue
+	SonarScanner CLI 5.0.1 su Java 17, mentre SonarQube Cloud richiede ora Java 21
+	o superiore. Sostituita con SonarSource/sonarqube-scan-action@v5 e SONAR_HOST_URL
+	esplicito, allineando la configurazione a quella gia' in uso su main e sugli
+	altri repository GovPay.
+
+	* [Dipendenze]
+	Risolte le 49 vulnerabilita' segnalate da OSV su 18 pacchetti transitivi.
+	Le versioni vulnerabili sono quelle fissate dalle properties di govpay-bom
+	1.1.3, sovrascritte qui in attesa di una versione del BOM che le incorpori:
+	spring-boot 3.5.15, spring-framework 6.2.19, spring-data 2025.1.5, tomcat
+	10.1.59, jackson 2.21.5, logback 1.5.34, log4j2 2.25.5 e postgresql 42.7.12.
+	Per tomcat il fix e' la 10.1.59 e non la 10.1.58 indicata da OSV, che non e'
+	mai stata pubblicata su Maven Central.
+	httpclient5 e httpcore5 sono invece gestiti da spring-boot-dependencies, che
+	govpay-bom importa con scope import: le properties di un BOM importato non
+	sono sovrascrivibili da valle, quindi per portarli a 5.6.3 e 5.4.3 servono
+	entry esplicite in dependencyManagement.
+
+2026-09-14  Giuliano Pintori <pintori@link.it>
+
 	* [ProjectSetup]
 	Avanzata versione del progetto a 1.0.3.
 
