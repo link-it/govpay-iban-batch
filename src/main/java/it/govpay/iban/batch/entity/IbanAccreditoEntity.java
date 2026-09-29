@@ -15,7 +15,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Entity
+// Nome JPA distinto da it.govpay.common.entity.IbanAccreditoEntity, che mappa
+// la stessa tabella. Nessuna JPQL referenzia questa entity per nome, quindi
+// il rename e' trasparente alle query derivate e ai criteri.
+@Entity(name = "IbanAccreditoBatchEntity")
 @Table(name = "IBAN_ACCREDITO")
 @Data
 @Builder
