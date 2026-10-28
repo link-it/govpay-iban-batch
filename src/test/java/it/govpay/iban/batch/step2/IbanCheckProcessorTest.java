@@ -1,6 +1,7 @@
 package it.govpay.iban.batch.step2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -189,5 +190,54 @@ class IbanCheckProcessorTest {
         // validityDate in past + ENABLED => isAfter(now) is false => ibanEnable = ENABLED && !false = true
         // stored is true => same => CHECK_OK
         assertEquals(Costanti.CHECK_OK, result.getCheckStato());
+    }
+
+    // ============ Valori di status restituiti da pagoPA ============
+
+    /** pagoPA restituisce ATTIVO, non ENABLED: un IBAN attivo su entrambi i lati e' OK. */
+    @Test
+    void process_statusAttivo_andEnabledOnGovpay_shouldSetCheckOk() throws Exception {
+        IbanPagopa iban = createIbanPagopa("ATTIVO", OffsetDateTime.now().minusDays(30), "desc", "name");
+        when(ibanAccreditoRepository.findByCodIbanAndDominioCodDominio(IBAN, FISCAL_CODE))
+                .thenReturn(List.of(createStoredIban(true, "desc", "name")));
+
+        IbanPagopa result = processor.process(iban);
+
+        assertEquals(Costanti.CHECK_OK, result.getCheckStato());
+        assertNull(result.getCheckMotivo());
+    }
+
+    @Test
+    void process_statusDisattivo_andDisabledOnGovpay_shouldSetCheckNonAttivo() throws Exception {
+        IbanPagopa iban = createIbanPagopa("DISATTIVO", null, "desc", "name");
+        when(ibanAccreditoRepository.findByCodIbanAndDominioCodDominio(IBAN, FISCAL_CODE))
+                .thenReturn(List.of(createStoredIban(false, "desc", "name")));
+
+        IbanPagopa result = processor.process(iban);
+
+        assertEquals(Costanti.CHECK_NON_ATTIVO, result.getCheckStato());
+    }
+
+    @Test
+    void process_statusSconosciuto_shouldBeTreatedAsNonAttivoAndReported() throws Exception {
+        IbanPagopa iban = createIbanPagopa("SOSPESO", null, "desc", "name");
+        when(ibanAccreditoRepository.findByCodIbanAndDominioCodDominio(IBAN, FISCAL_CODE))
+                .thenReturn(List.of(createStoredIban(true, "desc", "name")));
+
+        IbanPagopa result = processor.process(iban);
+
+        assertEquals(Costanti.CHECK_INFO_DIVERSE, result.getCheckStato());
+        assertEquals("Presenza di differenze: Abilitazione; Stato pagoPA non riconosciuto: SOSPESO", result.getCheckMotivo());
+    }
+
+    @Test
+    void process_statusSconosciuto_ibanNonCensito_shouldStillBeReported() throws Exception {
+        IbanPagopa iban = createIbanPagopa("SOSPESO", null, "desc", "name");
+        when(ibanAccreditoRepository.findByCodIbanAndDominioCodDominio(IBAN, FISCAL_CODE)).thenReturn(List.of());
+
+        IbanPagopa result = processor.process(iban);
+
+        assertEquals(Costanti.CHECK_NON_CENSITO, result.getCheckStato());
+        assertEquals("Stato pagoPA non riconosciuto: SOSPESO", result.getCheckMotivo());
     }
 }

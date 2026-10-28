@@ -1,3 +1,15 @@
+2026-10-28  Giuliano Pintori <pintori@link.it>
+
+	* [Verifica IBAN] Risolto Bug - gli IBAN attivi su pagoPA risultavano non
+	attivi (issue #28). Il batch riconosceva solo lo stato ENABLED, l'esempio
+	della specifica, mentre pagoPA restituisce ATTIVO/DISATTIVO, calcolato dal
+	backoffice in base alla data di attivazione (validityDate). Effetti: falsi
+	INFO_DIVERSE "Abilitazione" nel report per gli IBAN censiti e abilitati su
+	GovPay, e attivo=false in pagopa_iban_cache. La classificazione e' ora in
+	StatoIbanPagopa, usata da processor e writer: ATTIVO/ENABLED e
+	DISATTIVO/DISABLED sono riconosciuti, ogni altro valore e' trattato come non
+	attivo e segnalato nel log e in checkMotivo.
+
 2026-09-28  Giuliano Pintori <pintori@link.it>
 
 	* [Logging] Transaction ID e Correlation ID nelle esecuzioni batch (BP-LOG-3).

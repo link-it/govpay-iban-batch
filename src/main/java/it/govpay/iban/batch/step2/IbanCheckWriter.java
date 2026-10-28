@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.FileStorageConfig;
 import it.govpay.iban.batch.dto.IbanPagopa;
+import it.govpay.iban.batch.dto.StatoIbanPagopa;
 import it.govpay.iban.batch.entity.IbanCacheEntity;
 import it.govpay.iban.batch.repository.IbanCacheRepository;
 import it.govpay.iban.batch.utils.CsvRowGenerator;
@@ -169,9 +170,9 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     /**
      * Upserts pagopa_iban_cache keyed by (codDominio, iban), for the assisted
      * enrollment lookup (issue #34). "attivo" reflects only pagoPA's status
-     * (ENABLED), deliberately ignoring validityDate: its real semantics
-     * ("Activation Date" per spec vs. a possible expiration reading) are
-     * unconfirmed, so it is not used for any derived state here.
+     * (see {@link StatoIbanPagopa}). pagoPA already derives that status from
+     * validityDate (the activation date) when it exports the IBANs, so
+     * validityDate is not re-evaluated here.
      */
     private void upsertIbanCache(IbanPagopa ibanPagopa) {
         IbanCacheEntity cacheEntity = ibanCacheRepository
@@ -179,7 +180,7 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
                 .orElseGet(IbanCacheEntity::new);
         cacheEntity.setCodDominio(ibanPagopa.getFiscalCode());
         cacheEntity.setIban(ibanPagopa.getIban());
-        cacheEntity.setAttivo("ENABLED".equalsIgnoreCase(ibanPagopa.getStatus()));
+        cacheEntity.setAttivo(StatoIbanPagopa.da(ibanPagopa.getStatus()) == StatoIbanPagopa.ATTIVO);
         cacheEntity.setDataUltimaVerifica(OffsetDateTime.now(applicationZoneId));
         cacheEntity.setCodIntermediario(ibanPagopa.getCodIntermediario());
         cacheEntity.setCiName(ibanPagopa.getName());
