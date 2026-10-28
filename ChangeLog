@@ -1,3 +1,29 @@
+2026-10-28  Giuliano Pintori <pintori@link.it>
+
+	* [Report] Risolto Bug - la mail con i report non partiva (issue #26).
+	Il listener di fine job cercava gli allegati con un pattern basato sull'ora
+	di avvio del job, mentre ogni partizione nomina il proprio report con l'ora
+	in cui lo apre: i due orari coincidevano solo nello stesso secondo, quindi di
+	norma la mail non trovava allegati e non veniva inviata. Ora ogni partizione
+	registra il percorso del proprio report nel suo ExecutionContext e il
+	listener allega quei file.
+
+	* [Report] Il report CSV si apre alla prima riga da scrivere e inizia con la
+	riga di intestazione. Gli intermediari senza IBAN non producono piu' un file
+	vuoto. Se il file non si puo' creare lo step fallisce, invece di perdere il
+	report con un errore per riga nel log.
+
+	* [Report] La mail parte solo con contenuto valido: verifica degli IBAN
+	terminata correttamente e almeno un report con dati. In caso contrario il log
+	riporta il motivo. Il testo contiene il numero di IBAN per esito del
+	confronto, in totale e per intermediario.
+
+	* [Logging] Risolto Bug - il riepilogo per intermediario di fine job non
+	veniva mai stampato: cercava uno step (confrontoIbanStep) che non esiste.
+
+	* [Documentazione] Property govpay.report.* e variabili d'ambiente
+	GOVPAY_REPORT_* in README e docker/DOCKER.md.
+
 2026-09-28  Giuliano Pintori <pintori@link.it>
 
 	* [Logging] Transaction ID e Correlation ID nelle esecuzioni batch (BP-LOG-3).

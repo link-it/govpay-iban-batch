@@ -3,6 +3,8 @@ package it.govpay.iban.batch.step2;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -12,6 +14,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.batch.core.step.StepExecution;
 import org.springframework.batch.core.annotation.AfterStep;
@@ -47,6 +51,15 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     public static final String STATS_SAVED_COUNT = "ibansSavedCount";
     public static final String STATS_NO_CHANGE_COUNT = "ibansNoChangeCount";
 
+    /** Prefisso dei contatori per esito del confronto: {@code checkStato.<CHECK_*>}. */
+    public static final String STATS_CHECK_STATO_PREFIX = "checkStato.";
+
+    /**
+     * Chiave dell'ExecutionContext di partizione con il percorso del report scritto:
+     * il listener di fine job la usa per sapere quali file allegare alla mail.
+     */
+    public static final String REPORT_FILE_KEY = "reportFile";
+
     private static final DateTimeFormatter FILE_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     /** Terminatore di riga del report: fisso e non dipendente dalla piattaforma, cosi' il file e' identico ovunque giri il batch. */
@@ -76,17 +89,40 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
         // Inizializza i contatori nel contesto
         stepExecution.getExecutionContext().putInt(STATS_SAVED_COUNT, 0);
         stepExecution.getExecutionContext().putInt(STATS_NO_CHANGE_COUNT, 0);
-        
+    }
+
+    /**
+     * Apre il file di report alla prima scrittura, cosi' un intermediario senza IBAN
+     * non lascia un report vuoto. Il percorso viene registrato nel contesto dello step.
+     * Se il file non si puo' creare lo step fallisce: proseguire significherebbe
+     * perdere il report senza che nessuno se ne accorga.
+     */
+    private void apriReport() {
         String timestamp = LocalDateTime.now(applicationZoneId).format(FILE_TIMESTAMP_FORMATTER);
         String fileName = "reportCheckIban-" + codIntermediario + "-" + timestamp + ".csv";
-        Path reportDir = fileStorageConfig.getReportDirectory();
-        // Costruisce il percorso completo del file
-        Path filePath = reportDir.resolve(fileName);
+        Path filePath = fileStorageConfig.getReportDirectory().resolve(fileName);
         try {
-			reportOS = new BufferedOutputStream(new FileOutputStream(filePath.toFile()));
-		} catch (FileNotFoundException e) {
-			log.error("Cannot open report file", e);
-		}
+            reportOS = new BufferedOutputStream(new FileOutputStream(filePath.toFile()));
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException("Impossibile creare il file di report " + filePath, e);
+        }
+        scriviIntestazione(filePath);
+        if (stepExecution != null) {
+            stepExecution.getExecutionContext().putString(REPORT_FILE_KEY, filePath.toString());
+        }
+        log.info("Report dell'intermediario {}: {}", codIntermediario, filePath);
+    }
+
+    /** Prima riga del report: i nomi delle colonne, quotati come le righe di dati. */
+    private void scriviIntestazione(Path filePath) {
+        Map<String, String> intestazione = OUTPUT_HEADERS.stream()
+                .collect(Collectors.toMap(Function.identity(), Function.identity()));
+        String riga = csvRowGenerator.generateCsvRow(intestazione, OUTPUT_HEADERS);
+        try {
+            reportOS.write((riga + CSV_LINE_SEPARATOR).getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Impossibile scrivere l'intestazione del report " + filePath, e);
+        }
     }
 
     @AfterStep
@@ -104,6 +140,9 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
     @Override
     @Transactional
     public void write(Chunk<? extends IbanPagopa> chunk) {
+        if (reportOS == null && !chunk.isEmpty()) {
+            apriReport();
+        }
         for (IbanPagopa ibanData : chunk) {
             log.info("Scrittura di {} iban per l'intermediario {}", ibanData.getIban(), ibanData.getCodIntermediario());
 
@@ -112,6 +151,7 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
 
             // Aggiorna le statistiche nel contesto dello step
             updateStepContextStats(stats);
+            contaCheckStato(ibanData.getCheckStato());
 
             log.info("Intermediario {}: salvati {} IBAN, senza modifiche {} già in IBAN_ACCREDITO",
                      ibanData.getCodIntermediario(), stats.savedCount, stats.alreadyNoChangeCount);
@@ -125,6 +165,14 @@ public class IbanCheckWriter implements ItemWriter<IbanPagopa> {
 
             stepExecution.getExecutionContext().putInt(STATS_SAVED_COUNT, currentSaved + stats.savedCount);
             stepExecution.getExecutionContext().putInt(STATS_NO_CHANGE_COUNT, currentNoChange + stats.alreadyNoChangeCount);
+        }
+    }
+
+    /** Conta gli IBAN per esito del confronto: il listener di fine job li riporta nella mail. */
+    private void contaCheckStato(String checkStato) {
+        if (stepExecution != null) {
+            String key = STATS_CHECK_STATO_PREFIX + checkStato;
+            stepExecution.getExecutionContext().putInt(key, stepExecution.getExecutionContext().getInt(key, 0) + 1);
         }
     }
 

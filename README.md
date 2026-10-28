@@ -18,6 +18,7 @@ Il sistema verifica lo stato di attivazione degli IBAN configurati interrogando 
 
 - **Verifica IBAN**: Controllo automatico dell'attivazione degli IBAN su pagoPA
 - **Riconciliazione**: Aggiornamento automatico dello stato IBAN nel database GovPay
+- **Report**: Report CSV per intermediario con l'esito del confronto, inviabile via mail a fine esecuzione
 - **Multi-database**: Supporto per PostgreSQL, MySQL/MariaDB, Oracle, SQL Server, HSQLDB
 - **Schedulazione**: Esecuzione periodica configurabile o trigger manuale
 - **Retry automatico**: Gestione errori con retry e backoff esponenziale
@@ -78,6 +79,23 @@ MANAGEMENT_SERVER_PORT=[Porta dedicata per gli endpoint actuator]
 ```
 
 Se non valorizzata, gli endpoint restano sulla porta applicativa.
+
+## Report e notifica via mail
+
+Il batch scrive un report CSV per ogni intermediario con IBAN su pagoPA nella directory `govpay.report.dir`.
+Con `govpay.report.invia_mail=true` i report vengono inviati a `govpay.report.destinatario` (lista separata
+da virgola) tramite il server SMTP della configurazione `mail_batch` di GovPay, solo se la verifica e'
+terminata correttamente e almeno un report contiene dati.
+
+```properties
+govpay.report.dir=/var/govpay-iban/report
+govpay.report.invia_mail=true
+govpay.report.destinatario=operatore@ente.it
+govpay.report.oggetto=Report Check IBAN
+govpay.report.messaggio=In allegato il report di verifica IBAN.
+```
+
+Dettagli e variabili d'ambiente Docker in [docker/DOCKER.md](docker/DOCKER.md#report-e-notifica-via-mail).
 
 ## Configurazione Docker
 

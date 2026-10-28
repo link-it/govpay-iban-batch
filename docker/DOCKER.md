@@ -221,6 +221,31 @@ GOVPAY_IBAN_GDE_URL=http://govpay-gde-api:8080
 
 Quando `GOVPAY_IBAN_GDE_URL` è impostato, l'integrazione GDE viene automaticamente abilitata e il batch registrerà gli eventi nel giornale.
 
+## Report e notifica via mail
+
+A ogni esecuzione il batch scrive un report CSV per ogni intermediario che ha almeno un IBAN su pagoPA:
+`reportCheckIban-<codIntermediario>-<yyyyMMdd_HHmmss>.csv`, con riga di intestazione e un record per IBAN
+(esito del confronto nelle colonne `checkStato` e `checkMotivo`). Gli intermediari senza IBAN non producono file.
+
+La directory predefinita e' `/tmp`, che nel container non sopravvive al riavvio: per conservare i report
+montare un volume e indicarlo in `GOVPAY_REPORT_DIR`.
+
+A fine job i report possono essere inviati via mail. La mail parte solo se:
+
+- `GOVPAY_REPORT_INVIA_MAIL=true` e `GOVPAY_REPORT_DESTINATARIO` non e' vuoto;
+- in GovPay e' abilitata la configurazione `mail_batch` (tabella `configurazione`), da cui si legge il server SMTP;
+- la verifica degli IBAN e' terminata correttamente: con lo step fallito i report sarebbero parziali;
+- c'e' almeno un report con dati.
+
+Altrimenti la mail non parte e il log ne riporta il motivo. Il testo contiene il messaggio configurato
+e il numero di IBAN per esito (`OK`, `NON_CENSITO`, `INFO_DIVERSE`, `NON_ATTIVO`), in totale e per intermediario.
+
+```env
+GOVPAY_REPORT_DIR=/var/govpay-iban/report
+GOVPAY_REPORT_INVIA_MAIL=true
+GOVPAY_REPORT_DESTINATARIO=operatore@ente.it,referente@ente.it
+```
+
 ## Configuration Reference
 
 ### Variabili d'Ambiente - Database
@@ -261,6 +286,18 @@ Quando `GOVPAY_IBAN_GDE_URL` è impostato, l'integrazione GDE viene automaticame
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `GOVPAY_IBAN_GDE_URL` | No | - | URL servizio GDE (se impostato, GDE viene abilitato) |
+
+### Variabili d'Ambiente - Report e notifica via mail
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GOVPAY_REPORT_DIR` | No | `/tmp` | Directory dei report CSV (montarla come volume per conservarli) |
+| `GOVPAY_REPORT_INVIA_MAIL` | No | `false` | Invio dei report via mail a fine job |
+| `GOVPAY_REPORT_DESTINATARIO` | No* | - | Destinatari della mail, separati da virgola (*obbligatorio con invio abilitato) |
+| `GOVPAY_REPORT_OGGETTO` | No | `Report Check IBAN` | Oggetto della mail |
+| `GOVPAY_REPORT_MESSAGGIO` | No | `In allegato il report di verifica IBAN.` | Testo iniziale della mail, seguito dai conteggi per esito |
+
+Il server SMTP non si configura qui: e' quello della configurazione `mail_batch` di GovPay.
 
 ### Variabili d'Ambiente - Inizializzazione Database
 
