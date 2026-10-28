@@ -1,7 +1,6 @@
 package it.govpay.iban.batch.listener;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -11,17 +10,21 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.listener.JobExecutionListener;
 import org.springframework.batch.core.step.StepExecution;
 import org.springframework.stereotype.Component;
 
 import it.govpay.common.mail.MailInfo;
+import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.FileStorageConfig;
 import it.govpay.iban.batch.mail.MailService;
+import it.govpay.iban.batch.step2.IbanCheckWriter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -32,13 +35,17 @@ import lombok.extern.slf4j.Slf4j;
 public class BatchExecutionRecapListener implements JobExecutionListener {
 
 	private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
-	private static final DateTimeFormatter FILE_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+
+    private static final String MASTER_STEP_NAME = "ibanCheckAcquisitionStep";
+    private static final String WORKER_STEP_PREFIX = "ibanCheckWorkerStep";
+
+    /** Esiti del confronto nell'ordine in cui compaiono nel testo della mail. */
+    private static final List<String> CHECK_STATI = List.of(
+        Costanti.CHECK_OK, Costanti.CHECK_NON_CENSITO, Costanti.CHECK_INFO_DIVERSE, Costanti.CHECK_NON_ATTIVO);
 
     private final FileStorageConfig fileStorageConfig;
     private final MailService mailService;
     private final ZoneId applicationZoneId;
-
-    private String jobStartTimestamp;
 
     public BatchExecutionRecapListener(FileStorageConfig fileStorageConfig, MailService mailService,
                                        ZoneId applicationZoneId) {
@@ -49,7 +56,6 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
-        jobStartTimestamp = LocalDateTime.now(applicationZoneId).format(FILE_TIMESTAMP_FORMATTER);
         log.info("=".repeat(80));
         log.info("INIZIO BATCH CONTROLLO IBAN");
         log.info("Job ID: {}", jobExecution.getJobInstanceId());
@@ -76,10 +82,10 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
         log.info("=".repeat(80));
 
         // Invio report via email
-        inviaReportViaMail();
+        inviaReportViaMail(jobExecution);
     }
 
-    private void inviaReportViaMail() {
+    private void inviaReportViaMail(JobExecution jobExecution) {
         if (!fileStorageConfig.isInviaMail()) {
             log.debug("Invio report via mail disabilitato");
             return;
@@ -95,10 +101,9 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
             return;
         }
 
-        Map<String, byte[]> allegati = raccogliReportFiles();
+        Map<String, byte[]> allegati = raccogliReportFiles(jobExecution);
 
-        if (allegati.isEmpty()) {
-            log.info("Nessun file di report trovato da allegare");
+        if (!contenutoValido(jobExecution, allegati)) {
             return;
         }
 
@@ -106,7 +111,7 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
             MailInfo mailInfo = MailInfo.builder()
                 .to(fileStorageConfig.getDestinatario())
                 .oggetto(fileStorageConfig.getOggetto())
-                .testo(fileStorageConfig.getMessaggio())
+                .testo(costruisciTestoMail(jobExecution))
                 .allegati(allegati)
                 .build();
 
@@ -118,27 +123,90 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
     }
 
     /**
-     * Raccoglie i file di report CSV generati durante questa esecuzione del batch.
-     * I file hanno il formato reportCheckIban-{codIntermediario}-{yyyyMMdd_HHmmss}.csv
+     * La mail parte solo se la verifica degli IBAN e' terminata e c'e' almeno un
+     * report con dati: con lo step fallito i report sono parziali e mandarli
+     * farebbe passare per completa una verifica che non lo e'.
      */
-    private Map<String, byte[]> raccogliReportFiles() {
-        Map<String, byte[]> allegati = new LinkedHashMap<>();
-        Path reportDir = fileStorageConfig.getReportDirectory();
-
-        if (!Files.isDirectory(reportDir)) {
-            log.warn("Directory report non trovata: {}", reportDir);
-            return allegati;
+    private boolean contenutoValido(JobExecution jobExecution, Map<String, byte[]> allegati) {
+        BatchStatus statoVerifica = masterStep(jobExecution).map(StepExecution::getStatus).orElse(null);
+        if (statoVerifica != BatchStatus.COMPLETED) {
+            log.warn("Report non inviato via mail: la verifica degli IBAN non e' terminata correttamente (stato {})", statoVerifica);
+            return false;
         }
+        if (allegati.isEmpty()) {
+            log.info("Report non inviato via mail: nessun report con dati da allegare");
+            return false;
+        }
+        return true;
+    }
 
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(reportDir, "reportCheckIban-*-" + jobStartTimestamp + "*.csv")) {
-            for (Path file : stream) {
-                leggiReport(file).ifPresent(contenuto -> allegati.put(file.getFileName().toString(), contenuto));
+    /**
+     * Testo della mail: il messaggio configurato seguito dal numero di IBAN per
+     * esito del confronto, in totale e per intermediario.
+     */
+    private String costruisciTestoMail(JobExecution jobExecution) {
+        Map<String, Integer> totali = new LinkedHashMap<>();
+        CHECK_STATI.forEach(stato -> totali.put(stato, 0));
+        StringBuilder dettaglio = new StringBuilder();
+
+        for (StepExecution partizione : partizioni(jobExecution)) {
+            StringBuilder riga = new StringBuilder();
+            for (String stato : CHECK_STATI) {
+                int conteggio = partizione.getExecutionContext().getInt(IbanCheckWriter.STATS_CHECK_STATO_PREFIX + stato, 0);
+                totali.merge(stato, conteggio, Integer::sum);
+                if (conteggio > 0) {
+                    riga.append(riga.isEmpty() ? "" : ", ").append(stato).append(' ').append(conteggio);
+                }
             }
-        } catch (IOException e) {
-            log.error("Errore durante la scansione della directory report: {}", e.getMessage());
+            dettaglio.append("  ").append(extractCodIntermediario(partizione)).append(": ")
+                .append(riga.isEmpty() ? "nessun IBAN" : riga).append('\n');
         }
 
+        StringBuilder testo = new StringBuilder(fileStorageConfig.getMessaggio()).append("\n\nEsito della verifica:\n");
+        totali.forEach((stato, conteggio) -> testo.append("  ").append(stato).append(": ").append(conteggio).append('\n'));
+        testo.append("\nDettaglio per intermediario:\n").append(dettaglio);
+        return testo.toString();
+    }
+
+    private Optional<StepExecution> masterStep(JobExecution jobExecution) {
+        return jobExecution.getStepExecutions().stream()
+            .filter(se -> se.getStepName().equals(MASTER_STEP_NAME))
+            .findFirst();
+    }
+
+    private List<StepExecution> partizioni(JobExecution jobExecution) {
+        return jobExecution.getStepExecutions().stream()
+            .filter(se -> se.getStepName().startsWith(WORKER_STEP_PREFIX))
+            .toList();
+    }
+
+    /**
+     * Raccoglie i file di report CSV scritti in questa esecuzione. Ogni partizione
+     * registra il percorso del proprio report nel suo ExecutionContext
+     * ({@link IbanCheckWriter#REPORT_FILE_KEY}); le partizioni senza IBAN non
+     * scrivono un file e quindi non compaiono. Un report con la sola intestazione
+     * (nessuna riga di dati scritta) viene escluso.
+     */
+    private Map<String, byte[]> raccogliReportFiles(JobExecution jobExecution) {
+        Map<String, byte[]> allegati = new LinkedHashMap<>();
+        partizioni(jobExecution).stream()
+            .filter(se -> se.getExecutionContext().containsKey(IbanCheckWriter.REPORT_FILE_KEY))
+            .map(se -> Path.of(se.getExecutionContext().getString(IbanCheckWriter.REPORT_FILE_KEY)))
+            .forEach(file -> leggiReport(file)
+                .filter(BatchExecutionRecapListener::haRigheDiDati)
+                .ifPresent(contenuto -> allegati.put(file.getFileName().toString(), contenuto)));
         return allegati;
+    }
+
+    /** Vero se oltre all'intestazione c'e' almeno una riga (ogni riga e' terminata da newline). */
+    private static boolean haRigheDiDati(byte[] contenuto) {
+        int righe = 0;
+        for (byte b : contenuto) {
+            if (b == '\n' && ++righe > 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -158,23 +226,16 @@ public class BatchExecutionRecapListener implements JobExecutionListener {
     }
 
     private void printStepStatistics(JobExecution jobExecution) {
-        Collection<StepExecution> stepExecutions = jobExecution.getStepExecutions();
-
-        // Step 1: Check Iban from PagoPA
-        stepExecutions.stream()
-            .filter(se -> se.getStepName().equals("confrontoIbanStep"))
-            .findFirst()
-            .ifPresent(this::printCheckStepStats);
+        // Step 1: Check Iban from PagoPA (master step partizionato)
+        masterStep(jobExecution).ifPresent(this::printCheckStepStats);
     }
 
     private void printCheckStepStats(StepExecution masterStepExecution) {
-        log.info("--- STEP 2: CHECK IBAN ---");
+        log.info("--- STEP 1: CHECK IBAN ---");
         log.info("Status master step: {}", masterStepExecution.getStatus());
 
         // Statistiche aggregate dalle partizioni
-        Collection<StepExecution> partitionSteps = masterStepExecution.getJobExecution().getStepExecutions().stream()
-            .filter(se -> se.getStepName().startsWith("ibanCheckWorkerStep"))
-            .toList();
+        Collection<StepExecution> partitionSteps = partizioni(masterStepExecution.getJobExecution());
 
         if (partitionSteps.isEmpty()) {
             log.info("Nessuna partizione eseguita (nessun dominio da processare)");
