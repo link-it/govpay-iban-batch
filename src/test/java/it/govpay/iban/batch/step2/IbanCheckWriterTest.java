@@ -1,7 +1,9 @@
 package it.govpay.iban.batch.step2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -10,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -258,12 +261,14 @@ class IbanCheckWriterTest {
 
         // Ogni record deve stare su una riga propria: senza terminatore di riga i
         // record finivano concatenati su un'unica riga e il report era inutilizzabile.
-        assertEquals(3, Files.readAllLines(reportFile(), StandardCharsets.UTF_8).size());
+        // La prima riga e' l'intestazione.
+        assertEquals(4, Files.readAllLines(reportFile(), StandardCharsets.UTF_8).size());
 
-        // E il file deve restare un CSV valido: tre record, ognuno con tutte le colonne.
+        // E il file deve restare un CSV valido: intestazione piu' tre record, ognuno con tutte le colonne.
         try (CSVReader reader = new CSVReader(Files.newBufferedReader(reportFile(), StandardCharsets.UTF_8))) {
             List<String[]> record = reader.readAll();
-            assertEquals(3, record.size());
+            assertEquals(4, record.size());
+            assertEquals(IbanCheckWriter.OUTPUT_HEADERS, List.of(record.get(0)));
             for (String[] colonne : record) {
                 assertEquals(IbanCheckWriter.OUTPUT_HEADERS.size(), colonne.length,
                         "numero di colonne inatteso: " + String.join("|", colonne));
@@ -283,7 +288,7 @@ class IbanCheckWriterTest {
         // inglobare l'ultimo record a chi concatena piu' report.
         String contenuto = Files.readString(reportFile(), StandardCharsets.UTF_8);
         assertTrue(contenuto.endsWith("\n"), "il file non termina con un newline");
-        assertEquals(1, Files.readAllLines(reportFile(), StandardCharsets.UTF_8).size());
+        assertEquals(2, Files.readAllLines(reportFile(), StandardCharsets.UTF_8).size());
     }
 
     @Test
@@ -298,5 +303,68 @@ class IbanCheckWriterTest {
         // report non deve dipendere dal default della piattaforma.
         String contenuto = Files.readString(reportFile(), StandardCharsets.UTF_8);
         assertTrue(contenuto.contains("Citt\u00e0 di Sant'Ang\u00e8lo"), "denominazione accentata non leggibile: " + contenuto);
+    }
+
+    // ============ Percorso del report nel contesto della partizione ============
+
+    @Test
+    void write_shouldRegisterReportPathInStepContext() throws Exception {
+        when(fileStorageConfig.getReportDirectory()).thenReturn(tempDir);
+
+        StepExecution stepExecution = createStepExecution();
+        writer.beforeStep(stepExecution);
+        writer.write(new Chunk<>(createIbanPagopa(Costanti.CHECK_OK)));
+        writer.afterStep();
+
+        // Il listener di fine job allega i file indicati qui: deve essere proprio il file scritto.
+        assertEquals(reportFile().toString(), stepExecution.getExecutionContext().getString(IbanCheckWriter.REPORT_FILE_KEY));
+    }
+
+    @Test
+    void noItems_shouldNotCreateReportFile() throws Exception {
+        StepExecution stepExecution = createStepExecution();
+        writer.beforeStep(stepExecution);
+        writer.write(new Chunk<>());
+        writer.afterStep();
+
+        // Un intermediario senza IBAN non lascia un report vuoto e non ha niente da allegare.
+        try (Stream<Path> files = Files.list(tempDir)) {
+            assertEquals(0, files.count());
+        }
+        assertFalse(stepExecution.getExecutionContext().containsKey(IbanCheckWriter.REPORT_FILE_KEY));
+    }
+
+    @Test
+    void write_reportDirectoryMissing_shouldFailInsteadOfLosingTheReport() {
+        when(fileStorageConfig.getReportDirectory()).thenReturn(tempDir.resolve("non-esiste"));
+
+        writer.beforeStep(createStepExecution());
+        Chunk<IbanPagopa> chunk = new Chunk<>(createIbanPagopa(Costanti.CHECK_OK));
+
+        assertThrows(UncheckedIOException.class, () -> writer.write(chunk));
+    }
+
+    @Test
+    void write_shouldCountIbansByCheckStato() throws Exception {
+        when(fileStorageConfig.getReportDirectory()).thenReturn(tempDir);
+
+        StepExecution stepExecution = createStepExecution();
+        writer.beforeStep(stepExecution);
+        writer.write(new Chunk<>(
+                createIbanPagopa(Costanti.CHECK_OK),
+                createIbanPagopa(Costanti.CHECK_NON_CENSITO),
+                createIbanPagopa(Costanti.CHECK_OK)));
+        writer.write(new Chunk<>(createIbanPagopa(Costanti.CHECK_NON_ATTIVO)));
+        writer.afterStep();
+
+        // I conteggi per esito finiscono nel testo della mail: devono sommarsi fra i chunk.
+        var context = stepExecution.getExecutionContext();
+        assertEquals(2, context.getInt(IbanCheckWriter.STATS_CHECK_STATO_PREFIX + Costanti.CHECK_OK));
+        assertEquals(1, context.getInt(IbanCheckWriter.STATS_CHECK_STATO_PREFIX + Costanti.CHECK_NON_CENSITO));
+        assertEquals(1, context.getInt(IbanCheckWriter.STATS_CHECK_STATO_PREFIX + Costanti.CHECK_NON_ATTIVO));
+        assertFalse(context.containsKey(IbanCheckWriter.STATS_CHECK_STATO_PREFIX + Costanti.CHECK_INFO_DIVERSE));
+
+        // L'intestazione e' scritta una sola volta anche con piu' chunk.
+        assertEquals(5, Files.readAllLines(reportFile(), StandardCharsets.UTF_8).size());
     }
 }
