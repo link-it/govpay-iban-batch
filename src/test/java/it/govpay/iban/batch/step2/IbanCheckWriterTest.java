@@ -181,6 +181,22 @@ class IbanCheckWriterTest {
         writer.afterStep();
     }
 
+    /** pagoPA restituisce ATTIVO, non ENABLED: la cache deve segnare l'IBAN come attivo. */
+    @Test
+    void write_statusAttivo_shouldUpsertCacheAsAttivo() throws Exception {
+        when(fileStorageConfig.getReportDirectory()).thenReturn(tempDir);
+
+        writer.beforeStep(createStepExecution());
+        IbanPagopa iban = createIbanPagopa(Costanti.CHECK_OK);
+        iban.setStatus("ATTIVO");
+        writer.write(new Chunk<>(iban));
+        writer.afterStep();
+
+        ArgumentCaptor<IbanCacheEntity> captor = ArgumentCaptor.forClass(IbanCacheEntity.class);
+        verify(ibanCacheRepository).save(captor.capture());
+        assertEquals(Boolean.TRUE, captor.getValue().getAttivo());
+    }
+
     @Test
     void write_existingCacheRow_shouldUpdateInPlace() throws Exception {
         when(fileStorageConfig.getReportDirectory()).thenReturn(tempDir);

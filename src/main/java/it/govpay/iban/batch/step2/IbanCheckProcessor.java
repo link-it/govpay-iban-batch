@@ -2,6 +2,7 @@ package it.govpay.iban.batch.step2;
 
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.dto.IbanPagopa;
+import it.govpay.iban.batch.dto.StatoIbanPagopa;
 import it.govpay.iban.batch.entity.IbanAccreditoEntity;
 import it.govpay.iban.batch.repository.IbanAccreditoRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ public class IbanCheckProcessor implements ItemProcessor<IbanPagopa, IbanPagopa>
 	private void checkUpdated(IbanAccreditoEntity storedIban, IbanPagopa iban) {
 		StringJoiner stringJoiner = new StringJoiner(",");
 		boolean storedEnable = storedIban.getAbilitato() != null && storedIban.getAbilitato().booleanValue();
-		boolean ibanEnable   = iban.getStatus().equalsIgnoreCase("ENABLED") &&
+		boolean ibanEnable   = StatoIbanPagopa.da(iban.getStatus()) == StatoIbanPagopa.ATTIVO &&
 							   (iban.getValidityDate() == null || !iban.getValidityDate().isAfter(OffsetDateTime.now(applicationZoneId)));
 		String checkStato = Costanti.CHECK_OK;
 		if (storedEnable != ibanEnable) {
@@ -67,6 +68,22 @@ public class IbanCheckProcessor implements ItemProcessor<IbanPagopa, IbanPagopa>
 	        IbanAccreditoEntity storedIban = storedIbans.get(0);
 	        checkUpdated(storedIban, iban);
         }
+        segnalaStatoSconosciuto(iban);
         return iban;
+    }
+
+    /**
+     * Uno stato pagoPA non riconosciuto viene trattato come non attivo: lo si
+     * segnala nel log e nel motivo del report, perche' l'esito del confronto
+     * potrebbe dipendere da un valore nuovo introdotto da pagoPA.
+     */
+    private void segnalaStatoSconosciuto(IbanPagopa iban) {
+        if (StatoIbanPagopa.da(iban.getStatus()) != StatoIbanPagopa.SCONOSCIUTO) {
+            return;
+        }
+        log.warn("Stato pagoPA non riconosciuto '{}' per l'IBAN {} del dominio {}: trattato come non attivo",
+                iban.getStatus(), iban.getIban(), iban.getFiscalCode());
+        String segnalazione = "Stato pagoPA non riconosciuto: " + iban.getStatus();
+        iban.setCheckMotivo(iban.getCheckMotivo() == null ? segnalazione : iban.getCheckMotivo() + "; " + segnalazione);
     }
 }
