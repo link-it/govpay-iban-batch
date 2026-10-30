@@ -246,84 +246,9 @@ GOVPAY_REPORT_INVIA_MAIL=true
 GOVPAY_REPORT_DESTINATARIO=operatore@ente.it,referente@ente.it
 ```
 
-## Configuration Reference
+## Variabili d'ambiente
 
-### Variabili d'Ambiente - Database
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_DB_TYPE` | **Yes** | - | Tipo database: `postgresql`, `mysql`, `mariadb`, `oracle` |
-| `GOVPAY_DB_SERVER` | **Yes** | - | Server database nel formato `host:porta` |
-| `GOVPAY_DB_NAME` | **Yes** | - | Nome del database o service name |
-| `GOVPAY_DB_USER` | **Yes** | - | Username del database |
-| `GOVPAY_DB_PASSWORD` | **Yes** | - | Password del database |
-| `GOVPAY_DS_CONN_PARAM` | No | - | Parametri aggiuntivi URL JDBC (es: `sslmode=require`) |
-| `GOVPAY_ORACLE_JDBC_URL_TYPE` | No | `servicename` | Oracle: `servicename` o `sid` |
-| `GOVPAY_IBAN_MIN_POOL` | No | `2` | Connessioni minime pool HikariCP |
-| `GOVPAY_IBAN_MAX_POOL` | No | `10` | Connessioni massime pool HikariCP |
-| `GOVPAY_DS_JDBC_LIBS` | No | `/opt/jdbc-drivers` | Percorso driver JDBC |
-
-### Variabili d'Ambiente - IBAN (pagoPA)
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_IBAN_ENV` | **Yes*** | - | Ambiente: `prod`, `produzione`, `uat`, `collaudo`, `test`, `stage` |
-| `GOVPAY_IBAN_CUSTOMURL` | **Yes*** | - | URL personalizzato (alternativo a `GOVPAY_IBAN_ENV`) |
-| `GOVPAY_IBAN_SUBSCRIPTIONKEY` | **Yes** | - | Subscription Key API pagoPA |
-
-**Nota:* È richiesto `GOVPAY_IBAN_ENV` **oppure** `GOVPAY_IBAN_CUSTOMURL` (non entrambi)
-
-### Variabili d'Ambiente - Modalità Deployment
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_IBAN_BATCH_USA_CRON` | No | `false` | Modalità CRON: `true`, `si`, `yes`, `1` |
-| `GOVPAY_IBAN_BATCH_INTERVALLO_CRON` | No | `5` | Intervallo scheduler in minuti (modalità CRON) |
-| `SERVER_PORT` | No | `10001` | Porta Actuator (modalità CRON) |
-
-### Variabili d'Ambiente - Integrazione GDE
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_IBAN_GDE_URL` | No | - | URL servizio GDE (se impostato, GDE viene abilitato) |
-
-### Variabili d'Ambiente - Report e notifica via mail
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_REPORT_DIR` | No | `/tmp` | Directory dei report CSV (montarla come volume per conservarli) |
-| `GOVPAY_REPORT_INVIA_MAIL` | No | `false` | Invio dei report via mail a fine job |
-| `GOVPAY_REPORT_DESTINATARIO` | No* | - | Destinatari della mail, separati da virgola (*obbligatorio con invio abilitato) |
-| `GOVPAY_REPORT_OGGETTO` | No | `Report Check IBAN` | Oggetto della mail |
-| `GOVPAY_REPORT_MESSAGGIO` | No | `In allegato il report di verifica IBAN.` | Testo iniziale della mail, seguito dai conteggi per esito |
-
-Il server SMTP non si configura qui: e' quello della configurazione `mail_batch` di GovPay.
-
-### Variabili d'Ambiente - Inizializzazione Database
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_IBAN_POP_DB_SKIP` | No | `TRUE` | Salta inizializzazione DB: `TRUE`/`FALSE` |
-| `GOVPAY_IBAN_DB_CHECK_TABLE` | No | `batch_job_execution_context` | Tabella per readiness check |
-| `GOVPAY_IBAN_LIVE_DB_CHECK_SKIP` | No | `FALSE` | Salta liveness check (TCP) |
-| `GOVPAY_IBAN_LIVE_DB_CHECK_MAX_RETRY` | No | `30` | Tentativi max liveness check |
-| `GOVPAY_IBAN_LIVE_DB_CHECK_SLEEP_TIME` | No | `2` | Secondi tra tentativi liveness |
-| `GOVPAY_IBAN_LIVE_DB_CHECK_CONNECT_TIMEOUT` | No | `5` | Timeout connessione TCP (secondi) |
-| `GOVPAY_IBAN_READY_DB_CHECK_SKIP` | No | `FALSE` | Salta readiness check (tabelle) |
-| `GOVPAY_IBAN_READY_DB_CHECK_MAX_RETRY` | No | `5` | Tentativi max readiness check |
-| `GOVPAY_IBAN_READY_DB_CHECK_SLEEP_TIME` | No | `2` | Secondi tra tentativi readiness |
-
-### Variabili d'Ambiente - JVM Memory
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOVPAY_IBAN_JVM_MAX_RAM_PERCENTAGE` | No | `80` | Percentuale RAM massima utilizzabile dalla JVM |
-| `GOVPAY_IBAN_JVM_INITIAL_RAM_PERCENTAGE` | No | - | Percentuale RAM iniziale |
-| `GOVPAY_IBAN_JVM_MIN_RAM_PERCENTAGE` | No | - | Percentuale RAM minima |
-| `GOVPAY_IBAN_JVM_MAX_METASPACE_SIZE` | No | - | Dimensione max Metaspace (es: `256m`) |
-| `GOVPAY_IBAN_JVM_MAX_DIRECT_MEMORY_SIZE` | No | - | Dimensione max Direct Memory (es: `128m`) |
-| `JAVA_OPTS` | No | - | Opzioni aggiuntive JVM |
-
+L'elenco completo delle variabili d'ambiente dell'immagine, con default e descrizione, è nel README del progetto: [Esecuzione con Docker](../README.md#esecuzione-con-docker).
 
 ### Health Check
 
