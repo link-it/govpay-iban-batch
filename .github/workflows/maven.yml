@@ -106,8 +106,10 @@ jobs:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         OSS_INDEX_USER: ${{ vars.OSS_INDEX_USER }}
         OSS_INDEX_PASSWORD: ${{ secrets.OSS_INDEX_PASSWORD }}
-        # Se la cache è esatta (stessa giornata) skippa l'update NVD
-        NOUPDATE_FLAG: ${{ steps.owasp-cache.outputs.cache-hit == 'true' && '-DautoUpdate=false' || '' }}
+        # Se la cache è esatta (stessa giornata) skippa l'update NVD. Il pom di
+        # govpay-bom fissa <autoUpdate>${owasp.autoUpdate}</autoUpdate>, quindi
+        # la proprietà da passare è owasp.autoUpdate: -DautoUpdate non ha effetto.
+        NOUPDATE_FLAG: ${{ steps.owasp-cache.outputs.cache-hit == 'true' && '-Dowasp.autoUpdate=false' || '' }}
 
     - name: Show JaCoCo report location and Zip JaCoCo HTML report
       run: |
