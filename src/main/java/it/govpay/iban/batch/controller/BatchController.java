@@ -2,8 +2,12 @@ package it.govpay.iban.batch.controller;
 
 import org.springframework.batch.core.job.Job;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,6 +16,7 @@ import it.govpay.common.batch.controller.AbstractBatchController;
 import it.govpay.common.batch.dto.BatchStatusInfo;
 import it.govpay.common.batch.dto.LastExecutionInfo;
 import it.govpay.common.batch.dto.NextExecutionInfo;
+import it.govpay.common.batch.dto.Problem;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.iban.batch.Costanti;
 import it.govpay.iban.batch.config.BatchControllerSupport;
@@ -71,6 +76,26 @@ public class BatchController extends AbstractBatchController {
         pagoPaApiClientFactory.clearApiCache();
         log.info("Cache svuotate con successo");
         return ResponseEntity.ok("Cache svuotate con successo");
+    }
+
+    /**
+     * Arresto di un'esecuzione. Con il JobRepository JDBC
+     * {@code JobRepository.getJobExecution} non restituisce {@code null} per un id
+     * inesistente ma lancia {@link EmptyResultDataAccessException}, che la
+     * superclasse non gestisce: senza questo override la richiesta
+     * risponderebbe 500 invece di 404.
+     */
+    @Override
+    @DeleteMapping("/executions/{executionId}")
+    public ResponseEntity<Object> stopExecution(@PathVariable long executionId) {
+        try {
+            return super.stopExecution(executionId);
+        } catch (EmptyResultDataAccessException e) {
+            Problem problem = Problem.notFound("JobExecution " + executionId + " non trovata.");
+            return ResponseEntity.status(problem.getStatus())
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(problem);
+        }
     }
 
     @GetMapping("/run")
