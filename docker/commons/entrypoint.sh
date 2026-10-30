@@ -116,8 +116,7 @@ GOVPAY_IBAN_MAX_POOL=${GOVPAY_IBAN_MAX_POOL:-10}
 
 if [ "${GOVPAY_IBAN_POP_DB_SKIP:-TRUE}" != "TRUE" ] && [ -n "${GOVPAY_DB_TYPE}" ]; then
     log_info "Esecuzione script di inizializzazione database..."
-    /usr/local/bin/init_iban_db.sh
-    if [ $? -ne 0 ]; then
+    if ! /usr/local/bin/init_iban_db.sh; then
         log_error "Inizializzazione database fallita"
         exit 1
     fi
