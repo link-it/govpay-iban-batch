@@ -1,3 +1,31 @@
+2026-10-30  Giuliano Pintori <pintori@link.it>
+
+	* [Docker] GOVPAY_IBAN_BATCH_INTERVALLO_CRON imposta di nuovo l'intervallo
+	del job: l'entrypoint la convertiva in una proprieta' che il batch non
+	legge. SCHEDULER_IBANCHECKJOB_FIXEDDELAYSTRING, se impostata, ha la
+	precedenza.
+
+	* [Docker] La password del database non viene piu' scritta nel log di
+	debug dell'entrypoint (/tmp/entrypoint_debug.log, rimosso) ne' lasciata
+	nel file rc di SqlTool.
+
+	* [Docker] Inizializzazione dello schema Spring Batch: nuovi tentativi se
+	il database non e' ancora raggiungibile, schema creato anche con
+	GOVPAY_IBAN_READY_DB_CHECK_SKIP=TRUE, errori di SqlTool riportati, verifica
+	della tabella corretta su Oracle.
+
+	* [Docker] Rimosse le variabili d'ambiente che nessuno legge; documentazione
+	dell'immagine riscritta (le variabili GOVPAY_IBAN_ENV, GOVPAY_IBAN_CUSTOMURL
+	e GOVPAY_IBAN_SUBSCRIPTIONKEY non sono mai esistite, le modalita' erano
+	descritte al contrario).
+
+	* [Build] Il profilo war produce un war deployabile su application server.
+
+	* [API] DELETE /api/batch/executions/{id} con un id inesistente risponde 404
+	invece di 500.
+
+	* [Documentazione] README allineato al modello comune dei progetti GovPay.
+
 2026-10-28  Giuliano Pintori <pintori@link.it>
 
 	* [Verifica IBAN] Risolto Bug - gli IBAN attivi su pagoPA risultavano non

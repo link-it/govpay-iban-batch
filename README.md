@@ -50,13 +50,14 @@ Le modifiche ai livelli di log fatte dalla console (riga `log_level` della tabel
 Requisiti: JDK 21 e Maven 3.8.1 o successivo.
 
 ```bash
-mvn clean install
+mvn clean install -P jar     # fat jar, per esecuzione standalone e container (profilo di default)
+mvn clean install -P war     # war, per il deploy su application server
 ```
 
-Il risultato è il fat jar `target/govpay-iban-batch.jar`. La build esegue i test e l'analisi OWASP Dependency-Check delle dipendenze; per escludere l'analisi OWASP, per esempio in sviluppo:
+Il profilo sceglie il packaging; il risultato è in `target/govpay-iban-batch.jar` o `target/govpay-iban-batch.war`. In entrambi i casi i driver JDBC non sono inclusi. La build esegue i test e l'analisi OWASP Dependency-Check delle dipendenze; per escludere l'analisi OWASP, per esempio in sviluppo:
 
 ```bash
-mvn clean install -Dowasp.phase=none
+mvn clean install -P jar -Dowasp.phase=none
 ```
 
 Per produrre anche `target/sql.zip`, con lo schema Spring Batch per ogni database e gli script di svecchiamento dei metadati, usato dall'immagine Docker e allegato alle release:
@@ -65,7 +66,7 @@ Per produrre anche `target/sql.zip`, con lo schema Spring Batch per ogni databas
 mvn clean install -Pjar,dist
 ```
 
-Il profilo `jar` va indicato insieme a `dist`: è quello che lascia i driver JDBC fuori dal jar. Il profilo `war` del pom oggi non produce un war (il packaging è fisso a `jar`) e non va usato.
+Il profilo `jar` va indicato insieme a `dist`: è quello che lascia i driver JDBC fuori dal jar.
 
 ## Configurazione
 
@@ -81,8 +82,8 @@ Le proprietà si impostano in `application.properties`, da riga di comando (`-D<
 | `govpay.batch.check-iban-chunk-size` | `1` | IBAN elaborati per transazione |
 | `govpay.batch.ec-sync-chunk-size` | `50` | Enti Creditori elaborati per transazione |
 | `govpay.batch.page-size` | `100` | Elementi per pagina chiesti all'API di pagoPA (l'API accetta al massimo 100) |
-| `govpay.batch.max-retries` | `3` | Letta in `BatchProperties` ma non usata: le chiamate a pagoPA non vengono ritentate |
-| `govpay.batch.skip-limit` | `10` | Non letta da nessun componente |
+
+Le chiamate a pagoPA non vengono ritentate: se la lettura di un intermediario fallisce, la sua partizione fallisce e i dati vengono ripresi all'esecuzione successiva.
 | `govpay.batch.enabled` | `true` | Letta in `BatchProperties` ma non usata: per non schedulare il job usare il profilo `cron` o un profilo diverso da `default` |
 
 ### Report e notifica via mail
@@ -129,6 +130,7 @@ URL e autenticazione dell'API di pagoPA e del GDE non sono proprietà del batch:
 | `spring.datasource.url` | - | URL JDBC del database di GovPay (obbligatoria) |
 | `spring.datasource.username` | - | Utente del database |
 | `spring.datasource.password` | - | Password del database |
+| `spring.datasource.jndi-name` | - | Nome JNDI del datasource, per il deploy del war su application server (es. `java:comp/env/jdbc/govpay`); se impostata, le altre proprietà `spring.datasource.*` sono ignorate |
 | `spring.datasource.driver-class-name` | dedotto dall'URL | Classe del driver JDBC |
 | `spring.jpa.database-platform` | dedotto dal driver | Dialetto Hibernate |
 | `spring.jpa.properties.hibernate.dialect` | dedotto dal driver | Dialetto Hibernate |
@@ -139,7 +141,7 @@ URL e autenticazione dell'API di pagoPA e del GDE non sono proprietà del batch:
 | `spring.datasource.hikari.idle-timeout` | `600000` (`10000` nel container) | Tempo dopo cui una connessione inattiva viene chiusa, in ms |
 | `spring.datasource.hikari.max-lifetime` | `1800000` (`600000` nel container) | Durata massima di una connessione, in ms |
 
-I driver JDBC non sono inclusi nel jar: vedi [Esecuzione](#esecuzione).
+I driver JDBC non sono inclusi né nel jar né nel war: vedi [Esecuzione](#esecuzione).
 
 ### Logging
 
@@ -215,6 +217,26 @@ java -Dloader.path=./jdbc-drivers \
      -jar target/govpay-iban-batch.jar --spring.profiles.active=cron
 ```
 
+### War su application server
+
+Il war si produce con `mvn clean install -P war` (`target/govpay-iban-batch.war`): non è allegato alle release né incluso nell'immagine Docker. Richiede un application server Jakarta EE 11 (Servlet 6.1), per esempio Tomcat 11.
+
+Il war usa il datasource dell'application server, indicato con `spring.datasource.jndi-name`; il driver JDBC va nelle librerie dell'application server. Le altre proprietà si passano come proprietà di sistema della JVM o variabili d'ambiente. Esempio per Tomcat, con il datasource definito in `conf/context.xml`:
+
+```xml
+<Resource name="jdbc/govpay" auth="Container" type="javax.sql.DataSource"
+          driverClassName="org.postgresql.Driver"
+          url="jdbc:postgresql://localhost:5432/govpay"
+          username="govpay" password="<password>" maxTotal="10"/>
+```
+
+```bash
+export CATALINA_OPTS="-Dspring.datasource.jndi-name=java:comp/env/jdbc/govpay -Dgovpay.report.dir=/var/govpay-iban/report"
+cp target/govpay-iban-batch.war $CATALINA_BASE/webapps/
+```
+
+Il batch gira con lo scheduler interno; API REST e actuator rispondono sotto il context path del war (es. `http://localhost:8080/govpay-iban-batch/actuator/health`).
+
 ## Esecuzione con Docker
 
 L'immagine è pubblicata su Docker Hub come [linkitaly/govpay-iban-batch](https://hub.docker.com/r/linkitaly/govpay-iban-batch) (release) e `linkitaly/govpay-iban-batch-dev` (sviluppo, a ogni push su `main`). Con lo scheduler interno il servizio risponde sulla porta `10001`; i driver JDBC si montano in `/opt/jdbc-drivers`. I report CSV vanno scritti su un volume, altrimenti si perdono al riavvio del container.
@@ -250,12 +272,12 @@ Variabili d'ambiente dell'immagine, oltre alle proprietà Spring Boot in forma d
 | `GOVPAY_IBAN_MIN_POOL` | no | `2` | Connessioni minime inattive del pool |
 | `GOVPAY_IBAN_MAX_POOL` | no | `10` | Connessioni massime del pool |
 | `GOVPAY_IBAN_BATCH_USA_CRON` | no | - | `true`, `si`, `yes` o `1`: esecuzione singola con il profilo `cron`, senza server HTTP; il container termina a fine job e va pianificato dall'esterno (es. CronJob Kubernetes). Altrimenti scheduler interno |
-| `GOVPAY_IBAN_BATCH_INTERVALLO_CRON` | no | `120` | Minuti tra un'esecuzione e l'altra con lo scheduler interno. **Oggi senza effetto**: l'entrypoint la converte in `SCHEDULER_IBANACQUISITIONJOB_FIXEDDELAYSTRING`, che il batch non legge; per cambiare l'intervallo usare `SCHEDULER_IBANCHECKJOB_FIXEDDELAYSTRING` (in ms) |
+| `GOVPAY_IBAN_BATCH_INTERVALLO_CRON` | no | `120` | Minuti tra un'esecuzione e l'altra con lo scheduler interno; un valore non numerico o zero blocca l'avvio |
+| `SCHEDULER_IBANCHECKJOB_FIXEDDELAYSTRING` | no | da `GOVPAY_IBAN_BATCH_INTERVALLO_CRON` | Intervallo in millisecondi (`scheduler.ibanCheckJob.fixedDelayString`); se impostata ha la precedenza e `GOVPAY_IBAN_BATCH_INTERVALLO_CRON` viene ignorata |
 | `SERVER_PORT` | no | `10001` | Porta HTTP con lo scheduler interno |
 | `MANAGEMENT_SERVER_PORT` | no | porta del servizio | Porta dedicata agli endpoint actuator |
 | `MANAGEMENT_ENDPOINTS` | no | `health,info,metrics,prometheus` | Endpoint actuator esposti |
 | `LOG_LEVEL_REFRESH_INTERVAL` | no | `60s` | Intervallo di rilettura dei livelli di log dal database |
-| `GOVPAY_IBAN_GDE_URL` | no | - | **Oggi senza effetto**: l'entrypoint ne ricava `GOVPAY_GDE_ENABLED` e `GOVPAY_GDE_BASE_URL`, che il batch non legge. L'invio al GDE si configura con il connettore `govpay_gde_api` di GovPay |
 | `GOVPAY_IBAN_POP_DB_SKIP` | no | `TRUE` | `FALSE` crea all'avvio le tabelle Spring Batch, se la tabella `GOVPAY_IBAN_DB_CHECK_TABLE` non esiste. Le tabelle di cache non sono create |
 | `GOVPAY_IBAN_DB_CHECK_TABLE` | no | `batch_job_execution_context` | Tabella che indica che lo schema Spring Batch è già presente |
 | `GOVPAY_IBAN_LIVE_DB_CHECK_SKIP` | no | `FALSE` | Salta l'attesa della porta del database prima dell'inizializzazione |
@@ -272,13 +294,13 @@ Variabili d'ambiente dell'immagine, oltre alle proprietà Spring Boot in forma d
 | `GOVPAY_IBAN_JVM_MAX_DIRECT_MEMORY_SIZE` | no | - | `-XX:MaxDirectMemorySize` della JVM |
 | `JAVA_OPTS` | no | - | Opzioni aggiuntive della JVM |
 
-L'identificativo del nodo (`govpay.batch.cluster-id`) è impostato dall'entrypoint, con la variabile `GOVPAY_BATCH_CLUSTER_ID`, all'indirizzo IP del container o al suo hostname se l'IP non si ricava: un valore passato dall'esterno viene sovrascritto. Le altre variabili che compaiono negli script dell'immagine (es. `INTERVALLO_MINUTI`, `HSQLDB_SHA256`) sono interne e non vanno impostate. Il log di avvio dell'entrypoint è in `/tmp/entrypoint_debug.log` dentro il container.
+L'identificativo del nodo (`govpay.batch.cluster-id`) è impostato dall'entrypoint, con la variabile `GOVPAY_BATCH_CLUSTER_ID`, all'indirizzo IP del container o al suo hostname se l'IP non si ricava: un valore passato dall'esterno viene sovrascritto. Le altre variabili che compaiono negli script dell'immagine (es. `INTERVALLO_MINUTI`, `HSQLDB_SHA256`) sono interne e non vanno impostate. `GOVPAY_IBAN_GDE_URL`, citata in versioni precedenti della documentazione, non ha effetto: l'invio al GDE si configura con il connettore `govpay_gde_api` di GovPay e, se la variabile è impostata, l'entrypoint lo segnala con un avviso. Il log di avvio dell'entrypoint è nello standard output del container (`docker logs`).
 
 Costruzione dell'immagine in locale, scansione delle vulnerabilità e pacchetti inclusi sono descritti in [docker/DOCKER.md](docker/DOCKER.md) e [docker/SCANSIONE.md](docker/SCANSIONE.md).
 
 ## Monitoraggio
 
-Con lo scheduler interno gli endpoint actuator rispondono di default sulla porta del servizio (`8080` con il jar, `10001` nel container):
+Con lo scheduler interno gli endpoint actuator rispondono di default sulla porta del servizio (`8080` con il jar, `10001` nel container; con il war, sotto il context path dell'applicazione):
 
 ```bash
 curl http://localhost:10001/actuator/health       # stato, compresa la connessione al database
@@ -303,7 +325,7 @@ Con lo scheduler interno il batch espone, sotto `/api/batch`, l'API comune ai ba
 | `GET /api/batch/info` | Nome e descrizione del batch |
 | `GET /api/batch/executions` | Elenco paginato delle esecuzioni |
 | `GET /api/batch/executions/{executionId}` | Dettaglio di un'esecuzione |
-| `DELETE /api/batch/executions/{executionId}` | Richiede l'arresto di un'esecuzione |
+| `DELETE /api/batch/executions/{executionId}` | Richiede l'arresto di un'esecuzione (`202`; `409` se non è in corso, `404` se non esiste) |
 | `GET /api/batch/cache/clear` | Svuota la cache dei connettori e dei client verso pagoPA |
 
 ```bash

@@ -1,47 +1,44 @@
 # JDBC Drivers
 
-I driver JDBC non sono inclusi nel fat jar dell'applicazione e devono essere forniti esternamente.
-Collocare i file JAR dei driver in questa directory: verranno montati nel container al path `/opt/jdbc-drivers`.
+I driver JDBC non sono inclusi nel fat jar dell'applicazione né nell'immagine e devono essere forniti esternamente.
+Collocare i file JAR dei driver in questa directory e montarla nel container al path `/opt/jdbc-drivers`
+(o nella directory indicata da `GOVPAY_DS_JDBC_LIBS`).
 
-L'entrypoint del container imposta automaticamente `LOADER_PATH=/opt/jdbc-drivers` in modo che
-il `PropertiesLauncher` di Spring Boot carichi i driver a runtime.
+L'entrypoint del container imposta `LOADER_PATH` su quella directory, in modo che il `PropertiesLauncher`
+di Spring Boot carichi i driver a runtime; la stessa directory è usata da SqlTool per creare lo schema
+Spring Batch all'avvio.
 
 ## Driver supportati
 
-Scaricare il driver JDBC corrispondente al database utilizzato:
+Versioni gestite da [govpay-bom](https://github.com/link-it/govpay-bom). L'immagine supporta
+`GOVPAY_DB_TYPE` uguale a `postgresql`, `mysql`, `mariadb` e `oracle`.
 
 ### PostgreSQL
 
 ```bash
-wget https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.9/postgresql-42.7.9.jar
+wget https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
 ```
 
 **License**: BSD-2-Clause
 
-### MySQL
+### MySQL e MariaDB
+
+L'entrypoint usa il driver MySQL (`com.mysql.cj.jdbc.Driver`) anche con `GOVPAY_DB_TYPE=mariadb`.
 
 ```bash
-wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/9.6.0/mysql-connector-j-9.6.0.jar
+wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/26.10.0/mysql-connector-j-26.10.0.jar
 ```
 
-**License**: GPL-2.0
+**License**: GPL-2.0 con Universal FOSS Exception
 
 ### Oracle
 
 ```bash
-wget https://repo1.maven.org/maven2/com/oracle/database/jdbc/ojdbc11/23.26.1.0.0/ojdbc11-23.26.1.0.0.jar
+wget https://repo1.maven.org/maven2/com/oracle/database/jdbc/ojdbc11/23.26.3.0.0/ojdbc11-23.26.3.0.0.jar
 ```
 
 **License**: Oracle Free Use Terms and Conditions (FUTC)
 **Note**: Verificare i termini di licenza Oracle prima dell'uso in produzione.
-
-### SQL Server
-
-```bash
-wget https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/12.8.2.jre11/mssql-jdbc-12.8.2.jre11.jar
-```
-
-**License**: MIT
 
 ## Verifica
 
@@ -59,9 +56,9 @@ L'applicazione caricherà quello appropriato in base alla configurazione `GOVPAY
 Esempio:
 ```
 jdbc-drivers/
-├── postgresql-42.7.9.jar
-├── mysql-connector-j-9.6.0.jar
-└── ojdbc11-23.26.1.0.0.jar
+├── postgresql-42.7.14.jar
+├── mysql-connector-j-26.10.0.jar
+└── ojdbc11-23.26.3.0.0.jar
 ```
 
 ## Troubleshooting
