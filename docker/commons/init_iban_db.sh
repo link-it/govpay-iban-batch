@@ -8,7 +8,8 @@
 # 3. Esecuzione script SQL se il database non è inizializzato
 #
 ##############################################################################
-set -x
+# Niente tracing (set -x): scriverebbe la password del database, che compare
+# nel file rc di SqlTool.
 set -e
 
 # Configurazione con valori di default
@@ -132,7 +133,12 @@ log_info "URL JDBC: ${JDBC_URL}"
 # CREAZIONE FILE RC SQLTOOL
 ##############################################################################
 
+# Il file rc contiene la password del database: si crea leggibile solo
+# dall'utente e si cancella all'uscita, insieme agli script copiati.
 SQLTOOL_RC_FILE="/tmp/sqltool_iban.rc"
+SQL_WORK_DIR="/tmp/iban_sql"
+trap 'rm -f "${SQLTOOL_RC_FILE}"; rm -rf "${SQL_WORK_DIR}"' EXIT
+umask 077
 cat > ${SQLTOOL_RC_FILE} <<EOSQLTOOL
 urlid iban_db
 url ${JDBC_URL}
@@ -233,23 +239,23 @@ if [ ! -f "${SQL_FILE}" ]; then
 fi
 
 # Copia script in posizione temporanea
-mkdir -p /tmp/iban_sql
-cp "/opt/sql/${SQL_DIR}"/*.sql /tmp/iban_sql/ 2>/dev/null || true
-cp "${BATCH_SCHEMA}" /tmp/iban_sql/
-log_info "Script SQL copiati in /tmp/iban_sql/"
+mkdir -p ${SQL_WORK_DIR}
+cp "/opt/sql/${SQL_DIR}"/*.sql ${SQL_WORK_DIR}/ 2>/dev/null || true
+cp "${BATCH_SCHEMA}" ${SQL_WORK_DIR}/
+log_info "Script SQL copiati in ${SQL_WORK_DIR}/"
 
 # Applica trasformazioni specifiche per vendor
 case "${GOVPAY_DB_TYPE}" in
     mysql|mariadb)
         log_info "Applicazione trasformazioni MySQL/MariaDB..."
         # Rimuove quote escaped negli statement COMMENT
-        sed -i -e "/COMMENT/s%\\\\'% %g" /tmp/iban_sql/*.sql
+        sed -i -e "/COMMENT/s%\\\\'% %g" ${SQL_WORK_DIR}/*.sql
         ;;
     oracle)
         log_info "Applicazione trasformazioni Oracle..."
         # Abilita modalità raw per trigger e funzioni
         sed -i -r -e '/^CREATE( OR REPLACE)? (TRIGGER|FUNCTION|PROCEDURE)/i .' \
-                  -e 's/^\/$/.\n:;/' /tmp/iban_sql/*.sql
+                  -e 's/^\/$/.\n:;/' ${SQL_WORK_DIR}/*.sql
         ;;
 esac
 
@@ -262,15 +268,11 @@ java ${INVOCAZIONE_CLIENT} \
     iban_db <<EOSQL
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 ${START_TRANSACTION}
-\i /tmp/iban_sql/schema-${GOVPAY_DB_TYPE}.sql
+\i ${SQL_WORK_DIR}/schema-${GOVPAY_DB_TYPE}.sql
 COMMIT;
 EOSQL
 
 SQL_EXIT_CODE=$?
-
-# Pulizia
-#rm -rf /tmp/iban_sql
-#rm -f ${SQLTOOL_RC_FILE}
 
 if [ ${SQL_EXIT_CODE} -eq 0 ]; then
     log_info "========================================"

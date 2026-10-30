@@ -8,10 +8,9 @@
 
 set -e
 
-# Debug di esecuzione (come govpay-docker)
-exec 6<> /tmp/entrypoint_debug.log
-exec 2>&6
-set -x
+# Niente tracing (set -x) e niente redirezione dello stderr su file: il
+# tracing scriveva nel log di debug anche la password del database (export di
+# SPRING_DATASOURCE_PASSWORD), e lo stderr della JVM finiva nello stesso file.
 
 # Funzioni di logging
 log_info() { echo -e "\033[0;32m[INFO]\033[0m $(date '+%Y-%m-%d %H:%M:%S') - $1"; }
