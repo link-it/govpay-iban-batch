@@ -18,7 +18,7 @@
     <packaging>jar</packaging>
 
     <name>GovPay IBAN Batch</name>
-    <description>Batch di verifica attivazione degli iban su pagoPA</description>
+    <description>Batch di verifica di IBAN ed Enti Creditori registrati su pagoPA rispetto a GovPay</description>
 
     <properties>
         <java.version>21</java.version>

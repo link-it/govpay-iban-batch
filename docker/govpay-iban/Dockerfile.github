@@ -9,7 +9,7 @@ ARG govpay_iban_home=/opt/govpay-iban
 ARG govpay_iban_log=/var/log/govpay-iban
 
 LABEL maintainer="Link.it s.r.l."
-LABEL description="GovPay IBAN (Verifica attivazione IBAN) Batch Processor"
+LABEL description="GovPay IBAN Batch: verifica di IBAN ed Enti Creditori registrati su pagoPA rispetto a GovPay"
 LABEL govpay.iban.version="${govpay_iban_fullversion}"
 USER root
 
@@ -74,10 +74,6 @@ USER govpay
 ENV SPRING_BATCH_JOB_ENABLED=false \
     GOVPAY_BATCH_ENABLED=true \
     GOVPAY_BATCH_THREAD_POOL_SIZE=5 \
-    GOVPAY_BATCH_HEADERS_CHUNK_SIZE=1 \
-    GOVPAY_BATCH_METADATA_CHUNK_SIZE=100 \
-    GOVPAY_BATCH_PAYMENTS_CHUNK_SIZE=50 \
-    GOVPAY_BATCH_SKIP_LIMIT=10 \
     GOVPAY_BATCH_STALE_THRESHOLD_MINUTES=120 \
     MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
     SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=20000 \
@@ -85,9 +81,7 @@ ENV SPRING_BATCH_JOB_ENABLED=false \
     SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=600000 \
     SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=2 \
     SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10 \
-    LOGGING_FILE_NAME=${GOVPAY_IBAN_LOGDIR}/govpay-iban.log \
-    LOGGING_DIRECTORYPATH=${GOVPAY_IBAN_LOGDIR} \
-    LOGGING_FILEPREFIX=govpay-iban
+    LOGGING_FILE_NAME=${GOVPAY_IBAN_LOGDIR}/govpay-iban.log
 
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

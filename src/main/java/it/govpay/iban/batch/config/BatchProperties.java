@@ -33,11 +33,6 @@ public class BatchProperties {
     private boolean enabled = true;
 
     /**
-     * Number of retries for failed API calls
-     */
-    private int maxRetries = 3;
-
-    /**
      * Page size for paginated requests to pagoPA API.
      * L'API di backoffice pagoPA dichiara "limit" con maximum 100: valori superiori
      * vengono rifiutati o troncati lato pagoPA.
