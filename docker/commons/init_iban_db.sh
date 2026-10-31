@@ -8,7 +8,8 @@
 # 3. Esecuzione script SQL se il database non è inizializzato
 #
 ##############################################################################
-set -x
+# Niente tracing (set -x): scriverebbe la password del database, che compare
+# nel file rc di SqlTool.
 set -e
 
 # Configurazione con valori di default
@@ -72,8 +73,13 @@ if [ "${GOVPAY_IBAN_LIVE_DB_CHECK_SKIP^^}" == "FALSE" ]; then
     DB_ALIVE=1
 
     while [ ${DB_ALIVE} -ne 0 ] && [ ${RETRY} -lt ${GOVPAY_IBAN_LIVE_DB_CHECK_MAX_RETRY} ]; do
-        nc -w ${GOVPAY_IBAN_LIVE_DB_CHECK_CONNECT_TIMEOUT} -z "${DB_HOST}" "${DB_PORT}"
-        DB_ALIVE=$?
+        # Con set -e un nc fallito fuori da un if chiuderebbe lo script al primo
+        # tentativo, senza riprovare.
+        if nc -w ${GOVPAY_IBAN_LIVE_DB_CHECK_CONNECT_TIMEOUT} -z "${DB_HOST}" "${DB_PORT}"; then
+            DB_ALIVE=0
+        else
+            DB_ALIVE=$?
+        fi
         RETRY=$((RETRY + 1))
 
         if [ ${DB_ALIVE} -ne 0 ]; then
@@ -132,7 +138,12 @@ log_info "URL JDBC: ${JDBC_URL}"
 # CREAZIONE FILE RC SQLTOOL
 ##############################################################################
 
+# Il file rc contiene la password del database: si crea leggibile solo
+# dall'utente e si cancella all'uscita, insieme agli script copiati.
 SQLTOOL_RC_FILE="/tmp/sqltool_iban.rc"
+SQL_WORK_DIR="/tmp/iban_sql"
+trap 'rm -f "${SQLTOOL_RC_FILE}"; rm -rf "${SQL_WORK_DIR}"' EXIT
+umask 077
 cat > ${SQLTOOL_RC_FILE} <<EOSQLTOOL
 urlid iban_db
 url ${JDBC_URL}
@@ -143,6 +154,10 @@ transiso TRANSACTION_READ_COMMITTED
 charset UTF-8
 EOSQLTOOL
 
+# Comando SqlTool, usato sia dal readiness check sia dalla creazione dello
+# schema: va definito qui perche' il readiness check si puo' saltare.
+INVOCAZIONE_CLIENT="-Dfile.encoding=UTF-8 -cp ${GOVPAY_DS_JDBC_LIBS}/*:/opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb/lib/sqltool.jar org.hsqldb.cmdline.SqlTool --rcFile=${SQLTOOL_RC_FILE} "
+
 ##############################################################################
 # READINESS CHECK (Esistenza Tabella)
 ##############################################################################
@@ -150,7 +165,6 @@ EOSQLTOOL
 if [ "${GOVPAY_IBAN_READY_DB_CHECK_SKIP^^}" == "FALSE" ]; then
     log_info "Esecuzione readiness check (tabella: ${GOVPAY_IBAN_DB_CHECK_TABLE})..."
 
-    # Costruzione query di verifica in base al tipo di database
     # Costruzione query di verifica in base al tipo di database
     case "${GOVPAY_DB_TYPE}" in
         postgresql)
@@ -160,14 +174,12 @@ if [ "${GOVPAY_IBAN_READY_DB_CHECK_SKIP^^}" == "FALSE" ]; then
             CHECK_QUERY="SELECT count(*) FROM information_schema.tables WHERE LOWER(table_name)='${GOVPAY_IBAN_DB_CHECK_TABLE,,}' AND LOWER(table_schema)='${GOVPAY_DB_NAME,,}';"
             ;;
         oracle)
-            CHECK_QUERY="SELECT count(*) FROM all_tables WHERE LOWER(table_name)='${GOVPAY_IBAN_DB_CHECK_TABLE,,}' AND LOWER(owner)='${GOVPAY_DB_USER^^}';"
+            CHECK_QUERY="SELECT count(*) FROM all_tables WHERE LOWER(table_name)='${GOVPAY_IBAN_DB_CHECK_TABLE,,}' AND owner='${GOVPAY_DB_USER^^}';"
             ;;
     esac
 
     RETRY=0
     TABLE_EXISTS=-1
-
-    INVOCAZIONE_CLIENT="-Dfile.encoding=UTF-8 -cp ${GOVPAY_DS_JDBC_LIBS}/*:/opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb/lib/sqltool.jar org.hsqldb.cmdline.SqlTool --rcFile=${SQLTOOL_RC_FILE} "
 
     while [ ${TABLE_EXISTS} -lt 0 ] && [ ${RETRY} -lt ${GOVPAY_IBAN_READY_DB_CHECK_MAX_RETRY} ]; do
         TABLE_COUNT=$(java ${INVOCAZIONE_CLIENT} \
@@ -233,23 +245,23 @@ if [ ! -f "${SQL_FILE}" ]; then
 fi
 
 # Copia script in posizione temporanea
-mkdir -p /tmp/iban_sql
-cp "/opt/sql/${SQL_DIR}"/*.sql /tmp/iban_sql/ 2>/dev/null || true
-cp "${BATCH_SCHEMA}" /tmp/iban_sql/
-log_info "Script SQL copiati in /tmp/iban_sql/"
+mkdir -p ${SQL_WORK_DIR}
+cp "/opt/sql/${SQL_DIR}"/*.sql ${SQL_WORK_DIR}/ 2>/dev/null || true
+cp "${BATCH_SCHEMA}" ${SQL_WORK_DIR}/
+log_info "Script SQL copiati in ${SQL_WORK_DIR}/"
 
 # Applica trasformazioni specifiche per vendor
 case "${GOVPAY_DB_TYPE}" in
     mysql|mariadb)
         log_info "Applicazione trasformazioni MySQL/MariaDB..."
         # Rimuove quote escaped negli statement COMMENT
-        sed -i -e "/COMMENT/s%\\\\'% %g" /tmp/iban_sql/*.sql
+        sed -i -e "/COMMENT/s%\\\\'% %g" ${SQL_WORK_DIR}/*.sql
         ;;
     oracle)
         log_info "Applicazione trasformazioni Oracle..."
         # Abilita modalità raw per trigger e funzioni
         sed -i -r -e '/^CREATE( OR REPLACE)? (TRIGGER|FUNCTION|PROCEDURE)/i .' \
-                  -e 's/^\/$/.\n:;/' /tmp/iban_sql/*.sql
+                  -e 's/^\/$/.\n:;/' ${SQL_WORK_DIR}/*.sql
         ;;
 esac
 
@@ -257,20 +269,17 @@ esac
 # Esecuzione script SQL
 log_info "Esecuzione script SQL in corso..."
 
+# Con set -e un errore di SqlTool chiuderebbe lo script senza il messaggio
+# d'errore: l'exit code si raccoglie con ||.
+SQL_EXIT_CODE=0
 java ${INVOCAZIONE_CLIENT} \
     --continueOnErr=false \
-    iban_db <<EOSQL
+    iban_db <<EOSQL || SQL_EXIT_CODE=$?
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 ${START_TRANSACTION}
-\i /tmp/iban_sql/schema-${GOVPAY_DB_TYPE}.sql
+\i ${SQL_WORK_DIR}/schema-${GOVPAY_DB_TYPE}.sql
 COMMIT;
 EOSQL
-
-SQL_EXIT_CODE=$?
-
-# Pulizia
-#rm -rf /tmp/iban_sql
-#rm -f ${SQLTOOL_RC_FILE}
 
 if [ ${SQL_EXIT_CODE} -eq 0 ]; then
     log_info "========================================"

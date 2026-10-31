@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,7 @@ import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -471,5 +473,44 @@ class BatchControllerTest {
         assertNotNull(response.getBody());
         assertEquals("scheduler", response.getBody().getSchedulingMode());
         assertNull(response.getBody().getNextExecutionTime());
+    }
+
+    // ============ Test arresto di un'esecuzione ============
+
+    @Test
+    void whenStopExecutionOfUnknownId_thenReturns404() {
+        // Il JobRepository JDBC lancia EmptyResultDataAccessException per un id inesistente
+        when(jobRepository.getJobExecution(999L)).thenThrow(new EmptyResultDataAccessException(1));
+
+        ResponseEntity<Object> response = batchController.stopExecution(999L);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        Problem problem = (Problem) response.getBody();
+        assertNotNull(problem);
+        assertEquals(Integer.valueOf(404), problem.getStatus());
+        assertTrue(problem.getDetail().contains("999"));
+    }
+
+    @Test
+    void whenStopExecutionNotRunning_thenReturns409() throws Exception {
+        JobExecution completed = createJobExecution(CLUSTER_ID, BatchStatus.COMPLETED);
+        when(jobRepository.getJobExecution(1L)).thenReturn(completed);
+        doThrow(new org.springframework.batch.core.launch.JobExecutionNotRunningException("non in corso"))
+                .when(jobExecutionHelper).stopExecution(completed);
+
+        ResponseEntity<Object> response = batchController.stopExecution(1L);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+    }
+
+    @Test
+    void whenStopExecutionRunning_thenReturns202() throws Exception {
+        JobExecution running = createJobExecution(CLUSTER_ID, BatchStatus.STARTED);
+        when(jobRepository.getJobExecution(1L)).thenReturn(running);
+
+        ResponseEntity<Object> response = batchController.stopExecution(1L);
+
+        assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
+        verify(jobExecutionHelper).stopExecution(running);
     }
 }
