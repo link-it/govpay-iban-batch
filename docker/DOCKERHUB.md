@@ -17,7 +17,7 @@ Batch Spring Boot di [GovPay](https://github.com/link-it/govpay) che confronta g
 - Report CSV per intermediario, con invio via mail tramite la configurazione `mail_batch` di GovPay
 - Scheduler interno (default) oppure esecuzione singola da pianificare all'esterno (`GOVPAY_IBAN_BATCH_USA_CRON=true`)
 - Coordinamento tra più nodi tramite i metadati Spring Batch sul database
-- Database PostgreSQL, MySQL/MariaDB e Oracle; driver JDBC da montare in `/opt/jdbc-drivers`
+- Database PostgreSQL, MySQL/MariaDB, Oracle e SQL Server; driver JDBC da montare in `/opt/jdbc-drivers`
 - Health check, metriche Prometheus e API REST per l'avvio manuale sulla porta `10001`
 
 ## Avvio
