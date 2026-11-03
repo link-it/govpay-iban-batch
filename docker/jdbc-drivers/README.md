@@ -11,7 +11,7 @@ Spring Batch all'avvio.
 ## Driver supportati
 
 Versioni gestite da [govpay-bom](https://github.com/link-it/govpay-bom). L'immagine supporta
-`GOVPAY_DB_TYPE` uguale a `postgresql`, `mysql`, `mariadb` e `oracle`.
+`GOVPAY_DB_TYPE` uguale a `postgresql`, `mysql`, `mariadb`, `oracle` e `sqlserver`.
 
 ### PostgreSQL
 
@@ -39,6 +39,14 @@ wget https://repo1.maven.org/maven2/com/oracle/database/jdbc/ojdbc11/23.26.3.0.0
 
 **License**: Oracle Free Use Terms and Conditions (FUTC)
 **Note**: Verificare i termini di licenza Oracle prima dell'uso in produzione.
+
+### SQL Server
+
+```bash
+wget https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/13.6.1.jre11/mssql-jdbc-13.6.1.jre11.jar
+```
+
+**License**: MIT
 
 ## Verifica
 
