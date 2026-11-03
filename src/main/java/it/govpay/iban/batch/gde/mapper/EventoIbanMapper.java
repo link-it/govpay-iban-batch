@@ -1,6 +1,7 @@
 package it.govpay.iban.batch.gde.mapper;
 
 import it.govpay.gde.client.beans.*;
+import it.govpay.iban.batch.config.BatchInfraConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -27,7 +28,7 @@ public class EventoIbanMapper {
 
     private static final int MAX_DETTAGLIO_ESITO_LENGTH = 1000;
 
-    @Value("${govpay.batch.cluster-id}")
+    @Value(BatchInfraConfig.CLUSTER_ID)
     private String clusterId;
 
     /**
