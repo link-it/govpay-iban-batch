@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.job.parameters.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.context.annotation.Bean;
@@ -57,7 +56,6 @@ public class BatchJobConfiguration {
         it.govpay.iban.batch.listener.BatchExecutionRecapListener batchExecutionRecapListener
     ) {
         return new JobBuilder(Costanti.IBAN_CHECK_JOB_NAME, jobRepository)
-            .incrementer(new RunIdIncrementer())
             .listener(batchExecutionRecapListener)
             .start(ibanCheckAcquisitionStep)
             .next(cleanupStaleIbanCacheStep)
