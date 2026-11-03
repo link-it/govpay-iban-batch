@@ -27,10 +27,6 @@ public class BatchProperties {
      */
     private int ecSyncChunkSize = 50;
 
-    /**
-     * Enable/disable automatic scheduling
-     */
-    private boolean enabled = true;
 
     /**
      * Page size for paginated requests to pagoPA API.

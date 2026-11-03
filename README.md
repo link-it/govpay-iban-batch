@@ -84,7 +84,7 @@ Le proprietà si impostano in `application.properties`, da riga di comando (`-D<
 | `govpay.batch.page-size` | `100` | Elementi per pagina chiesti all'API di pagoPA (l'API accetta al massimo 100) |
 
 Le chiamate a pagoPA non vengono ritentate: se la lettura di un intermediario fallisce, la sua partizione fallisce e i dati vengono ripresi all'esecuzione successiva.
-| `govpay.batch.enabled` | `true` | Letta in `BatchProperties` ma non usata: per non schedulare il job usare il profilo `cron` o un profilo diverso da `default` |
+| `govpay.batch.enabled` | `true` | Con `false` lo scheduler interno non avvia il job (all'avvio il log lo segnala); `/run` e il profilo `cron` restano disponibili. Nel profilo `cron` non ha effetto |
 
 ### Report e notifica via mail
 
