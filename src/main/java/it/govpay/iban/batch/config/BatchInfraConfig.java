@@ -27,6 +27,15 @@ import jakarta.persistence.EntityManager;
 @Configuration
 public class BatchInfraConfig {
 
+    /**
+     * Cluster-id del nodo: {@code govpay.batch.cluster-id} (o la variabile
+     * {@code GOVPAY_BATCH_CLUSTER_ID}) se impostata, altrimenti l'identificativo
+     * dell'host ({@link it.govpay.common.batch.config.ClusterIdPredefinito}).
+     * Deve essere diverso su ogni nodo (govpay-common#36).
+     */
+    public static final String CLUSTER_ID =
+            "${govpay.batch.cluster-id:#{T(it.govpay.common.batch.config.ClusterIdPredefinito).valore()}}";
+
     @Bean
     public JobConcurrencyService jobConcurrencyService(
             JobRepository jobRepository,
@@ -38,7 +47,7 @@ public class BatchInfraConfig {
     public JobExecutionHelper jobExecutionHelper(
             JobOperator jobOperator,
             JobConcurrencyService jobConcurrencyService,
-            @Value("${govpay.batch.cluster-id:GovPay-iban-Batch}") String clusterId,
+            @Value(CLUSTER_ID) String clusterId,
             ZoneId applicationZoneId) {
         return new JobExecutionHelper(jobOperator, jobConcurrencyService, clusterId, applicationZoneId);
     }
