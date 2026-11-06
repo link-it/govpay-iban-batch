@@ -135,6 +135,7 @@ URL e autenticazione dell'API di pagoPA e del GDE non sono proprietà del batch:
 | `spring.jpa.database-platform` | dedotto dal driver | Dialetto Hibernate |
 | `spring.jpa.properties.hibernate.dialect` | dedotto dal driver | Dialetto Hibernate |
 | `spring.jpa.hibernate.ddl-auto` | `none` (`create-drop` con database embedded) | Gestione dello schema: lasciare `none` o `validate`, lo schema è di GovPay |
+| `spring.jpa.open-in-view` | `false` | Sessione JPA limitata ai servizi, non estesa alle richieste REST |
 | `spring.datasource.hikari.minimum-idle` | `10` (`2` nel container) | Connessioni minime inattive del pool |
 | `spring.datasource.hikari.maximum-pool-size` | `10` | Connessioni massime del pool; con più intermediari in parallelo tenerla sopra `govpay.batch.thread-pool-size` |
 | `spring.datasource.hikari.connection-timeout` | `30000` (`20000` nel container) | Attesa massima di una connessione, in ms |
