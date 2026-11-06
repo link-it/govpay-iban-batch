@@ -1,3 +1,11 @@
+2026-11-06  Giuliano Pintori <pintori@link.it>
+
+	* [Config] spring.jpa.open-in-view=false: la sessione JPA non resta aperta
+	per tutta la richiesta REST. Ora e' possibile perche' govpay-common carica
+	la jobInstance insieme all'esecuzione in GET /api/batch/executions/{id}
+	(govpay-common 9d8bc90), che prima con la sessione chiusa rispondeva 500.
+	Spring Boot non registra piu' l'avviso su open-in-view all'avvio.
+
 2026-11-03  Giuliano Pintori <pintori@link.it>
 
 	* [Batch] Cluster-id del nodo come default (govpay-common#35, #36).
